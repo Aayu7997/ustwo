@@ -1,0 +1,184 @@
+import React, { useEffect, useRef, useState } from 'react';
+import Plyr from 'plyr';
+import 'plyr/dist/plyr.css';
+import { useRealtimeSync } from '@/hooks/useRealtimeSync';
+import { PlaybackState } from '@/hooks/useRoom';
+import { useAuth } from '@/hooks/useAuth';
+
+interface MediaPlayerProps {
+  roomId: string;
+  videoUrl?: string;
+  onPlaybackStateChange?: (state: PlaybackState) => void;
+}
+
+export const MediaPlayer: React.FC<MediaPlayerProps> = ({
+  roomId,
+  videoUrl = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+  onPlaybackStateChange
+}) => {
+  const { user } = useAuth();
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const playerRef = useRef<Plyr | null>(null);
+  const [isPlayerReady, setIsPlayerReady] = useState(false);
+  const syncIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const lastSyncTimeRef = useRef<number>(0);
+  const userInitiatedRef = useRef<boolean>(false);
+
+  const handlePlaybackUpdate = (state: PlaybackState) => {
+    if (!playerRef.current || !user) return;
+
+    // Don't sync if this user made the change
+    if (state.last_updated_by === user.id) return;
+
+    const player = playerRef.current;
+    const currentTime = player.currentTime;
+    const timeDrift = Math.abs(currentTime - state.current_time_seconds);
+
+    // Resync if drift > 1 second
+    if (timeDrift > 1) {
+      console.log(`Resyncing: drift of ${timeDrift}s detected`);
+      player.currentTime = state.current_time_seconds;
+    }
+
+    // Update play/pause state
+    if (state.is_playing && player.paused) {
+      userInitiatedRef.current = false;
+      player.play();
+    } else if (!state.is_playing && !player.paused) {
+      userInitiatedRef.current = false;
+      player.pause();
+    }
+
+    onPlaybackStateChange?.(state);
+  };
+
+  const handleMediaSync = (currentTime: number, isPlaying: boolean) => {
+    if (!playerRef.current) return;
+
+    const player = playerRef.current;
+    const timeDrift = Math.abs(player.currentTime - currentTime);
+
+    // Only sync if there's significant drift and it wasn't user-initiated
+    if (timeDrift > 1 && !userInitiatedRef.current) {
+      player.currentTime = currentTime;
+    }
+
+    // Reset user-initiated flag
+    userInitiatedRef.current = false;
+  };
+
+  const { sendPlaybackUpdate } = useRealtimeSync({
+    roomId,
+    onPlaybackUpdate: handlePlaybackUpdate,
+    onMediaSync: handleMediaSync
+  });
+
+  useEffect(() => {
+    if (!videoRef.current) return;
+
+    // Initialize Plyr
+    const player = new Plyr(videoRef.current, {
+      controls: [
+        'play-large',
+        'play',
+        'progress',
+        'current-time',
+        'duration',
+        'mute',
+        'volume',
+        'settings',
+        'fullscreen'
+      ],
+      settings: ['quality', 'speed'],
+      quality: {
+        default: 720,
+        options: [1080, 720, 480, 360]
+      }
+    });
+
+    playerRef.current = player;
+
+    // Player event listeners
+    player.on('ready', () => {
+      console.log('Player ready');
+      setIsPlayerReady(true);
+    });
+
+    player.on('play', () => {
+      console.log('Play event');
+      userInitiatedRef.current = true;
+      sendPlaybackUpdate(player.currentTime, true);
+    });
+
+    player.on('pause', () => {
+      console.log('Pause event');
+      userInitiatedRef.current = true;
+      sendPlaybackUpdate(player.currentTime, false);
+    });
+
+    player.on('seeked', () => {
+      console.log('Seeked event');
+      userInitiatedRef.current = true;
+      sendPlaybackUpdate(player.currentTime, !player.paused);
+    });
+
+    // Sync every 500ms during playback
+    const startSyncInterval = () => {
+      if (syncIntervalRef.current) {
+        clearInterval(syncIntervalRef.current);
+      }
+      
+      syncIntervalRef.current = setInterval(() => {
+        if (player && !player.paused) {
+          const currentTime = player.currentTime;
+          // Only sync if enough time has passed since last sync
+          if (Date.now() - lastSyncTimeRef.current > 450) {
+            sendPlaybackUpdate(currentTime, true);
+            lastSyncTimeRef.current = Date.now();
+          }
+        }
+      }, 500);
+    };
+
+    player.on('playing', startSyncInterval);
+    player.on('pause', () => {
+      if (syncIntervalRef.current) {
+        clearInterval(syncIntervalRef.current);
+        syncIntervalRef.current = null;
+      }
+    });
+
+    return () => {
+      if (syncIntervalRef.current) {
+        clearInterval(syncIntervalRef.current);
+      }
+      if (player) {
+        player.destroy();
+      }
+    };
+  }, [roomId, sendPlaybackUpdate]);
+
+  return (
+    <div className="w-full max-w-4xl mx-auto">
+      <video
+        ref={videoRef}
+        className="w-full rounded-lg shadow-lg"
+        controls
+        crossOrigin="anonymous"
+        playsInline
+      >
+        <source src={videoUrl} type="video/mp4" />
+        Your browser does not support the video tag.
+      </video>
+      
+      {!isPlayerReady && (
+        <div className="flex items-center justify-center h-64 bg-muted rounded-lg">
+          <div className="text-center">
+            <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+            <p className="text-muted-foreground">Loading player...</p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
