@@ -14,16 +14,328 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      calendar_events: {
+        Row: {
+          created_at: string
+          creator_id: string
+          description: string | null
+          end_time: string
+          id: string
+          partner_id: string | null
+          room_id: string | null
+          start_time: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          creator_id: string
+          description?: string | null
+          end_time: string
+          id?: string
+          partner_id?: string | null
+          room_id?: string | null
+          start_time: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          creator_id?: string
+          description?: string | null
+          end_time?: string
+          id?: string
+          partner_id?: string | null
+          room_id?: string | null
+          start_time?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_events_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invites: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          invite_code: string
+          receiver_email: string
+          receiver_id: string | null
+          sender_id: string
+          status: Database["public"]["Enums"]["invite_status"] | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          invite_code?: string
+          receiver_email: string
+          receiver_id?: string | null
+          sender_id: string
+          status?: Database["public"]["Enums"]["invite_status"] | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          invite_code?: string
+          receiver_email?: string
+          receiver_id?: string | null
+          sender_id?: string
+          status?: Database["public"]["Enums"]["invite_status"] | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      love_stats: {
+        Row: {
+          created_at: string
+          date: string
+          hearts_received: number | null
+          hearts_sent: number | null
+          id: string
+          partner_id: string
+          sessions_count: number | null
+          updated_at: string
+          user_id: string
+          watch_time_minutes: number | null
+        }
+        Insert: {
+          created_at?: string
+          date?: string
+          hearts_received?: number | null
+          hearts_sent?: number | null
+          id?: string
+          partner_id: string
+          sessions_count?: number | null
+          updated_at?: string
+          user_id: string
+          watch_time_minutes?: number | null
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          hearts_received?: number | null
+          hearts_sent?: number | null
+          id?: string
+          partner_id?: string
+          sessions_count?: number | null
+          updated_at?: string
+          user_id?: string
+          watch_time_minutes?: number | null
+        }
+        Relationships: []
+      }
+      media_sources: {
+        Row: {
+          created_at: string
+          created_by: string
+          duration_seconds: number | null
+          id: string
+          media_type: Database["public"]["Enums"]["media_type"]
+          thumbnail_url: string | null
+          title: string
+          url: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          duration_seconds?: number | null
+          id?: string
+          media_type: Database["public"]["Enums"]["media_type"]
+          thumbnail_url?: string | null
+          title: string
+          url: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          duration_seconds?: number | null
+          id?: string
+          media_type?: Database["public"]["Enums"]["media_type"]
+          thumbnail_url?: string | null
+          title?: string
+          url?: string
+        }
+        Relationships: []
+      }
+      notes: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          is_read: boolean | null
+          receiver_id: string
+          sender_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          is_read?: boolean | null
+          receiver_id: string
+          sender_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          is_read?: boolean | null
+          receiver_id?: string
+          sender_id?: string
+        }
+        Relationships: []
+      }
+      playback_state: {
+        Row: {
+          created_at: string
+          current_time_seconds: number | null
+          id: string
+          is_playing: boolean | null
+          last_updated_by: string | null
+          media_id: string | null
+          room_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          current_time_seconds?: number | null
+          id?: string
+          is_playing?: boolean | null
+          last_updated_by?: string | null
+          media_id?: string | null
+          room_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          current_time_seconds?: number | null
+          id?: string
+          is_playing?: boolean | null
+          last_updated_by?: string | null
+          media_id?: string | null
+          room_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "playback_state_media_id_fkey"
+            columns: ["media_id"]
+            isOneToOne: false
+            referencedRelation: "media_sources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "playback_state_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rooms: {
+        Row: {
+          created_at: string
+          creator_id: string
+          id: string
+          is_private: boolean | null
+          name: string
+          partner_id: string | null
+          room_code: string | null
+          status: Database["public"]["Enums"]["room_status"] | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          creator_id: string
+          id?: string
+          is_private?: boolean | null
+          name: string
+          partner_id?: string | null
+          room_code?: string | null
+          status?: Database["public"]["Enums"]["room_status"] | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          creator_id?: string
+          id?: string
+          is_private?: boolean | null
+          name?: string
+          partner_id?: string | null
+          room_code?: string | null
+          status?: Database["public"]["Enums"]["room_status"] | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      users: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          display_name: string | null
+          id: string
+          partner_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          partner_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          partner_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "users_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      generate_invite_code: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      generate_room_code: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
     }
     Enums: {
-      [_ in never]: never
+      invite_status: "pending" | "accepted" | "declined"
+      media_type: "video" | "audio" | "stream"
+      room_status: "active" | "paused" | "ended"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +462,10 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      invite_status: ["pending", "accepted", "declined"],
+      media_type: ["video", "audio", "stream"],
+      room_status: ["active", "paused", "ended"],
+    },
   },
 } as const
