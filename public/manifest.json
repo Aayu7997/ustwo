@@ -1,0 +1,72 @@
+{
+  "manifest_version": 3,
+  "name": "UsTwo - OTT Sync",
+  "version": "1.0.0",
+  "description": "Sync video playback with your partner across Netflix, Prime Video, Hotstar, YouTube and more",
+  
+  "permissions": [
+    "activeTab",
+    "storage",
+    "tabs",
+    "webNavigation"
+  ],
+  
+  "host_permissions": [
+    "https://www.netflix.com/*",
+    "https://www.primevideo.com/*",
+    "https://www.hotstar.com/*",
+    "https://www.youtube.com/*",
+    "https://www.hulu.com/*",
+    "https://www.disneyplus.com/*",
+    "https://play.hbomax.com/*",
+    "https://www.crunchyroll.com/*",
+    "https://mxatgocmnasozbkbjiuq.supabase.co/*"
+  ],
+  
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.netflix.com/*",
+        "https://www.primevideo.com/*", 
+        "https://www.hotstar.com/*",
+        "https://www.youtube.com/*",
+        "https://www.hulu.com/*",
+        "https://www.disneyplus.com/*",
+        "https://play.hbomax.com/*",
+        "https://www.crunchyroll.com/*"
+      ],
+      "js": ["content-script.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "UsTwo - Sync with your partner",
+    "default_icon": {
+      "16": "favicon.ico",
+      "32": "favicon.ico", 
+      "48": "favicon.ico",
+      "128": "favicon.ico"
+    }
+  },
+  
+  "icons": {
+    "16": "favicon.ico",
+    "32": "favicon.ico",
+    "48": "favicon.ico", 
+    "128": "favicon.ico"
+  },
+  
+  "web_accessible_resources": [
+    {
+      "resources": ["popup.html", "popup.css"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}

@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      width: 380px;
+      min-height: 500px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      overflow-x: hidden;
+    }
+    
+    .header {
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      padding: 20px;
+      text-align: center;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .logo {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    
+    .logo-icon {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, #ec4899, #8b5cf6);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+    }
+    
+    .title {
+      font-size: 20px;
+      font-weight: 700;
+      margin: 0;
+    }
+    
+    .subtitle {
+      font-size: 13px;
+      opacity: 0.8;
+      margin: 0;
+    }
+    
+    .content {
+      padding: 24px 20px;
+    }
+    
+    .status-card {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 20px;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #10b981;
+      animation: pulse 2s infinite;
+    }
+    
+    .status-dot.disconnected {
+      background: #f59e0b;
+    }
+    
+    .status-dot.error {
+      background: #ef4444;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    
+    .platform-info {
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 12px;
+      padding: 16px;
+      margin: 16px 0;
+    }
+    
+    .platform-name {
+      font-weight: 600;
+      font-size: 14px;
+      margin-bottom: 4px;
+    }
+    
+    .platform-url {
+      font-size: 12px;
+      opacity: 0.7;
+      word-break: break-all;
+    }
+    
+    .room-section {
+      margin-bottom: 24px;
+    }
+    
+    .section-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .room-code {
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 12px;
+      padding: 16px;
+      text-align: center;
+      margin: 12px 0;
+    }
+    
+    .room-code-label {
+      font-size: 12px;
+      opacity: 0.7;
+      margin-bottom: 8px;
+    }
+    
+    .room-code-value {
+      font-family: 'SF Mono', Monaco, monospace;
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: 4px;
+      margin-bottom: 12px;
+    }
+    
+    .input-group {
+      margin-bottom: 16px;
+    }
+    
+    .input-label {
+      font-size: 13px;
+      font-weight: 500;
+      margin-bottom: 8px;
+      display: block;
+    }
+    
+    .input {
+      width: 100%;
+      padding: 14px 16px;
+      border: none;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.1);
+      color: white;
+      font-size: 14px;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      transition: all 0.2s ease;
+    }
+    
+    .input:focus {
+      outline: none;
+      background: rgba(255, 255, 255, 0.15);
+      border-color: rgba(255, 255, 255, 0.3);
+      transform: translateY(-1px);
+    }
+    
+    .input::placeholder {
+      color: rgba(255, 255, 255, 0.5);
+    }
+    
+    .button {
+      width: 100%;
+      padding: 14px 20px;
+      border: none;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .button-primary {
+      background: rgba(255, 255, 255, 0.9);
+      color: #667eea;
+    }
+    
+    .button-primary:hover {
+      background: white;
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+    }
+    
+    .button-secondary {
+      background: rgba(255, 255, 255, 0.1);
+      color: white;
+      margin-top: 8px;
+    }
+    
+    .button-secondary:hover {
+      background: rgba(255, 255, 255, 0.2);
+      transform: translateY(-1px);
+    }
+    
+    .button-danger {
+      background: rgba(239, 68, 68, 0.2);
+      color: #fca5a5;
+      border-color: rgba(239, 68, 68, 0.3);
+    }
+    
+    .button-danger:hover {
+      background: rgba(239, 68, 68, 0.3);
+      color: white;
+    }
+    
+    .button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+    
+    .button-row {
+      display: flex;
+      gap: 8px;
+    }
+    
+    .button-row .button {
+      flex: 1;
+    }
+    
+    .divider {
+      height: 1px;
+      background: rgba(255, 255, 255, 0.1);
+      margin: 20px 0;
+    }
+    
+    .auth-section {
+      text-align: center;
+      padding: 20px;
+    }
+    
+    .auth-message {
+      font-size: 14px;
+      margin-bottom: 16px;
+      opacity: 0.8;
+    }
+    
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px;
+    }
+    
+    .spinner {
+      width: 24px;
+      height: 24px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-top: 2px solid white;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    .hidden {
+      display: none;
+    }
+    
+    .error-message {
+      background: rgba(239, 68, 68, 0.2);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      border-radius: 8px;
+      padding: 12px;
+      margin: 12px 0;
+      font-size: 13px;
+      color: #fca5a5;
+    }
+    
+    .success-message {
+      background: rgba(16, 185, 129, 0.2);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      border-radius: 8px;
+      padding: 12px;
+      margin: 12px 0;
+      font-size: 13px;
+      color: #6ee7b7;
+    }
+    
+    .copy-button {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 8px;
+      padding: 8px 12px;
+      color: white;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    
+    .copy-button:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo">
+      <div class="logo-icon">💕</div>
+      <div>
+        <h1 class="title">UsTwo</h1>
+        <p class="subtitle">Sync with your partner</p>
+      </div>
+    </div>
+  </div>
+
+  <div id="loading" class="loading">
+    <div class="spinner"></div>
+  </div>
+
+  <div id="auth-section" class="auth-section hidden">
+    <div class="auth-message">
+      Sign in to your UsTwo account to sync with your partner
+    </div>
+    <button class="button button-primary" id="sign-in-btn">
+      Sign In to UsTwo
+    </button>
+  </div>
+
+  <div id="main-content" class="content hidden">
+    <!-- Player Status -->
+    <div class="status-card">
+      <div class="status-indicator">
+        <div class="status-dot" id="player-status-dot"></div>
+        <span id="player-status-text">Checking for video player...</span>
+      </div>
+      <div id="platform-info" class="platform-info hidden">
+        <div class="platform-name" id="platform-name"></div>
+        <div class="platform-url" id="platform-url"></div>
+      </div>
+    </div>
+
+    <!-- Room Section -->
+    <div id="no-room-section" class="room-section">
+      <div class="section-title">
+        🏠 Join or Create Room
+      </div>
+      
+      <div class="input-group">
+        <label class="input-label">Room Code</label>
+        <input type="text" class="input" id="room-code-input" placeholder="Enter 6-letter code" maxlength="6">
+      </div>
+      
+      <button class="button button-primary" id="join-room-btn">
+        Join Partner's Room
+      </button>
+      
+      <div class="divider"></div>
+      
+      <div class="input-group">
+        <label class="input-label">New Room Name</label>
+        <input type="text" class="input" id="room-name-input" placeholder="Our Movie Night" maxlength="50">
+      </div>
+      
+      <button class="button button-secondary" id="create-room-btn">
+        Create New Room
+      </button>
+    </div>
+
+    <div id="in-room-section" class="room-section hidden">
+      <div class="section-title">
+        🏠 Current Room
+      </div>
+      
+      <div class="room-code">
+        <div class="room-code-label">Share this code with your partner</div>
+        <div class="room-code-value" id="current-room-code"></div>
+        <button class="copy-button" id="copy-room-code">📋 Copy Code</button>
+      </div>
+      
+      <div class="status-indicator">
+        <div class="status-dot" id="sync-status-dot"></div>
+        <span id="sync-status-text">Sync enabled</span>
+      </div>
+      
+      <button class="button button-danger" id="leave-room-btn">
+        Leave Room
+      </button>
+    </div>
+
+    <!-- Error/Success Messages -->
+    <div id="message-container"></div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
