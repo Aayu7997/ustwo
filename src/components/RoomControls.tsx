@@ -6,8 +6,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useRoom, Room } from '@/hooks/useRoom';
 import { useAuth } from '@/hooks/useAuth';
-import { Copy, Heart, Users, Video } from 'lucide-react';
+import { Copy, Heart, Users, Video, Shield } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
+import { validateRoomName, validateRoomCode, roomRateLimiter } from '@/lib/validation';
 
 interface RoomControlsProps {
   room?: Room | null;
@@ -28,16 +29,29 @@ export const RoomControls: React.FC<RoomControlsProps> = ({
   const [showJoinDialog, setShowJoinDialog] = useState(false);
 
   const handleCreateRoom = async () => {
-    if (!roomName.trim()) {
+    // Rate limiting check
+    if (!roomRateLimiter.isAllowed(user?.id || 'anonymous')) {
+      const remainingTime = Math.ceil(roomRateLimiter.getRemainingTime(user?.id || 'anonymous') / 60000);
       toast({
-        title: "Error",
-        description: "Please enter a room name",
+        title: "Too many attempts",
+        description: `Please wait ${remainingTime} minutes before creating another room`,
         variant: "destructive"
       });
       return;
     }
 
-    const newRoom = await createRoom(roomName);
+    // Enhanced validation
+    const validation = validateRoomName(roomName);
+    if (!validation.valid) {
+      toast({
+        title: "Invalid Room Name",
+        description: validation.message,
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const newRoom = await createRoom(validation.sanitized);
     if (newRoom) {
       setShowCreateDialog(false);
       setRoomName('');
@@ -46,16 +60,29 @@ export const RoomControls: React.FC<RoomControlsProps> = ({
   };
 
   const handleJoinRoom = async () => {
-    if (!joinCode.trim()) {
+    // Rate limiting check
+    if (!roomRateLimiter.isAllowed(user?.id || 'anonymous')) {
+      const remainingTime = Math.ceil(roomRateLimiter.getRemainingTime(user?.id || 'anonymous') / 60000);
       toast({
-        title: "Error",
-        description: "Please enter a room code",
+        title: "Too many attempts",
+        description: `Please wait ${remainingTime} minutes before trying again`,
         variant: "destructive"
       });
       return;
     }
 
-    const joinedRoom = await joinRoom(joinCode);
+    // Enhanced validation
+    const validation = validateRoomCode(joinCode);
+    if (!validation.valid) {
+      toast({
+        title: "Invalid Room Code",
+        description: validation.message,
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const joinedRoom = await joinRoom(validation.sanitized);
     if (joinedRoom) {
       setShowJoinDialog(false);
       setJoinCode('');
@@ -198,12 +225,16 @@ export const RoomControls: React.FC<RoomControlsProps> = ({
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4">
-                <Input
-                  placeholder="Enter room name (e.g., 'Our Movie Night')"
-                  value={roomName}
-                  onChange={(e) => setRoomName(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleCreateRoom()}
-                />
+                <div className="relative">
+                  <Input
+                    placeholder="Enter room name (e.g., 'Our Movie Night')"
+                    value={roomName}
+                    onChange={(e) => setRoomName(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleCreateRoom()}
+                    maxLength={50}
+                  />
+                  <Shield className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                </div>
                 <div className="flex gap-2">
                   <Button
                     variant="outline"
@@ -249,13 +280,18 @@ export const RoomControls: React.FC<RoomControlsProps> = ({
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4">
-                <Input
-                  placeholder="Enter room code (e.g., ABC123)"
-                  value={joinCode}
-                  onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                  onKeyPress={(e) => e.key === 'Enter' && handleJoinRoom()}
-                  className="font-mono text-center text-lg tracking-widest"
-                />
+                <div className="relative">
+                  <Input
+                    placeholder="Enter room code (e.g., ABC123)"
+                    value={joinCode}
+                    onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                    onKeyPress={(e) => e.key === 'Enter' && handleJoinRoom()}
+                    className="font-mono text-center text-lg tracking-widest pr-10"
+                    maxLength={6}
+                    pattern="[A-Z0-9]{6}"
+                  />
+                  <Shield className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                </div>
                 <div className="flex gap-2">
                   <Button
                     variant="outline"

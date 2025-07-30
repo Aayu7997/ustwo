@@ -6,8 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Heart, Mail, Lock } from 'lucide-react';
+import { Heart, Mail, Lock, Shield } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
+import { validateEmail, validatePassword, authRateLimiter } from '@/lib/validation';
 
 const Auth: React.FC = () => {
   const navigate = useNavigate();
@@ -24,10 +25,32 @@ const Auth: React.FC = () => {
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Rate limiting check
+    if (!authRateLimiter.isAllowed(email || 'anonymous')) {
+      const remainingTime = Math.ceil(authRateLimiter.getRemainingTime(email || 'anonymous') / 60000);
+      toast({
+        title: "Too many attempts",
+        description: `Please wait ${remainingTime} minutes before trying again`,
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Enhanced validation
     if (!email || !password) {
       toast({
         title: "Error",
         description: "Please fill in all fields",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!validateEmail(email)) {
+      toast({
+        title: "Invalid Email",
+        description: "Please enter a valid email address",
         variant: "destructive"
       });
       return;
@@ -53,6 +76,19 @@ const Auth: React.FC = () => {
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Rate limiting check
+    if (!authRateLimiter.isAllowed(email || 'anonymous')) {
+      const remainingTime = Math.ceil(authRateLimiter.getRemainingTime(email || 'anonymous') / 60000);
+      toast({
+        title: "Too many attempts",
+        description: `Please wait ${remainingTime} minutes before trying again`,
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Enhanced validation
     if (!email || !password) {
       toast({
         title: "Error",
@@ -62,10 +98,20 @@ const Auth: React.FC = () => {
       return;
     }
 
-    if (password.length < 6) {
+    if (!validateEmail(email)) {
       toast({
-        title: "Error",
-        description: "Password must be at least 6 characters long",
+        title: "Invalid Email",
+        description: "Please enter a valid email address",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const passwordValidation = validatePassword(password);
+    if (!passwordValidation.valid) {
+      toast({
+        title: "Weak Password",
+        description: passwordValidation.message,
         variant: "destructive"
       });
       return;
@@ -200,17 +246,20 @@ const Auth: React.FC = () => {
                   </div>
                   
                   <div className="space-y-2">
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                      <Input
-                        type="password"
-                        placeholder="Password (min. 6 characters)"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        className="pl-10"
-                        required
-                      />
-                    </div>
+                     <div className="relative">
+                       <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                       <Input
+                         type="password"
+                         placeholder="Strong password (8+ chars, mixed case, numbers)"
+                         value={password}
+                         onChange={(e) => setPassword(e.target.value)}
+                         className="pl-10"
+                         required
+                         minLength={8}
+                         maxLength={128}
+                       />
+                       <Shield className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                     </div>
                   </div>
                   
                   <Button
