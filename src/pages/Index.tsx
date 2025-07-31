@@ -4,7 +4,11 @@ import { motion } from 'framer-motion';
 import { useAuth } from '@/hooks/useAuth';
 import { useRoom, Room } from '@/hooks/useRoom';
 import { RoomControls } from '@/components/RoomControls';
+import { SharedCalendar } from '@/components/SharedCalendar';
+import { NotesTimeline } from '@/components/NotesTimeline';
+import { LoveMeter } from '@/components/LoveMeter';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Heart, LogOut } from 'lucide-react';
 
 const Index = () => {
@@ -92,17 +96,17 @@ const Index = () => {
         </motion.div>
 
         {/* Main Content */}
-        <div className="flex flex-col items-center justify-center space-y-8">
+        <div className="max-w-6xl mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-            className="text-center space-y-4 max-w-2xl"
+            className="text-center space-y-4 mb-8"
           >
             <h2 className="text-4xl font-bold text-foreground">
               Create Your Private Cinema
             </h2>
-            <p className="text-xl text-muted-foreground">
+            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
               Share movies, TV shows, and special moments with your partner in real-time. 
               Perfect for long-distance relationships and cozy nights together.
             </p>
@@ -112,51 +116,76 @@ const Index = () => {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.4 }}
-            className="w-full max-w-md"
           >
-            <RoomControls
-              room={currentRoom}
-              onRoomCreated={handleRoomCreated}
-              onRoomJoined={handleRoomJoined}
-            />
-          </motion.div>
+            <Tabs defaultValue="rooms" className="w-full">
+              <TabsList className="grid w-full grid-cols-4 mb-8">
+                <TabsTrigger value="rooms">Rooms</TabsTrigger>
+                <TabsTrigger value="calendar">Calendar</TabsTrigger>
+                <TabsTrigger value="notes">Notes</TabsTrigger>
+                <TabsTrigger value="stats">Love Meter</TabsTrigger>
+              </TabsList>
 
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.6 }}
-            className="text-center space-y-4"
-          >
-            <h3 className="text-lg font-semibold">How it works</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-3xl">
-              <div className="text-center space-y-2">
-                <div className="w-12 h-12 bg-pink-100 dark:bg-pink-900 rounded-full flex items-center justify-center mx-auto">
-                  <span className="text-pink-600 dark:text-pink-400 font-bold">1</span>
+              <TabsContent value="rooms" className="space-y-6">
+                <div className="max-w-md mx-auto">
+                  <RoomControls
+                    room={currentRoom}
+                    onRoomCreated={handleRoomCreated}
+                    onRoomJoined={handleRoomJoined}
+                  />
                 </div>
-                <h4 className="font-medium">Create or Join</h4>
-                <p className="text-sm text-muted-foreground">
-                  One partner creates a room, the other joins with the code
-                </p>
-              </div>
-              <div className="text-center space-y-2">
-                <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900 rounded-full flex items-center justify-center mx-auto">
-                  <span className="text-purple-600 dark:text-purple-400 font-bold">2</span>
-                </div>
-                <h4 className="font-medium">Watch Together</h4>
-                <p className="text-sm text-muted-foreground">
-                  Video playback automatically syncs between both of you
-                </p>
-              </div>
-              <div className="text-center space-y-2">
-                <div className="w-12 h-12 bg-pink-100 dark:bg-pink-900 rounded-full flex items-center justify-center mx-auto">
-                  <span className="text-pink-600 dark:text-pink-400 font-bold">3</span>
-                </div>
-                <h4 className="font-medium">Stay Connected</h4>
-                <p className="text-sm text-muted-foreground">
-                  Optional video calls and real-time reactions
-                </p>
-              </div>
-            </div>
+
+                {/* How it works section */}
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.6 }}
+                  className="text-center space-y-4"
+                >
+                  <h3 className="text-lg font-semibold">How it works</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="text-center space-y-2">
+                      <div className="w-12 h-12 bg-pink-100 dark:bg-pink-900 rounded-full flex items-center justify-center mx-auto">
+                        <span className="text-pink-600 dark:text-pink-400 font-bold">1</span>
+                      </div>
+                      <h4 className="font-medium">Create or Join</h4>
+                      <p className="text-sm text-muted-foreground">
+                        One partner creates a room, the other joins with the code
+                      </p>
+                    </div>
+                    <div className="text-center space-y-2">
+                      <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900 rounded-full flex items-center justify-center mx-auto">
+                        <span className="text-purple-600 dark:text-purple-400 font-bold">2</span>
+                      </div>
+                      <h4 className="font-medium">Watch Together</h4>
+                      <p className="text-sm text-muted-foreground">
+                        Video playback automatically syncs between both of you
+                      </p>
+                    </div>
+                    <div className="text-center space-y-2">
+                      <div className="w-12 h-12 bg-pink-100 dark:bg-pink-900 rounded-full flex items-center justify-center mx-auto">
+                        <span className="text-pink-600 dark:text-pink-400 font-bold">3</span>
+                      </div>
+                      <h4 className="font-medium">Stay Connected</h4>
+                      <p className="text-sm text-muted-foreground">
+                        Optional video calls and real-time reactions
+                      </p>
+                    </div>
+                  </div>
+                </motion.div>
+              </TabsContent>
+
+              <TabsContent value="calendar">
+                <SharedCalendar partnerId={currentRoom?.partner_id} />
+              </TabsContent>
+
+              <TabsContent value="notes">
+                <NotesTimeline partnerId={currentRoom?.partner_id} />
+              </TabsContent>
+
+              <TabsContent value="stats">
+                <LoveMeter partnerId={currentRoom?.partner_id} />
+              </TabsContent>
+            </Tabs>
           </motion.div>
         </div>
       </div>

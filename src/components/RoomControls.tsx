@@ -101,12 +101,12 @@ export const RoomControls: React.FC<RoomControlsProps> = ({
   };
 
   const copyRoomLink = () => {
-    if (room?.id) {
-      const link = `${window.location.origin}/room/${room.id}`;
-      navigator.clipboard.writeText(link);
+    if (room?.room_code) {
+      const inviteLink = `${window.location.origin}/invite/${room.room_code}`;
+      navigator.clipboard.writeText(inviteLink);
       toast({
-        title: "Copied!",
-        description: "Room link copied to clipboard"
+        title: "Invite Link Copied! 💕",
+        description: "Share this beautiful invite link with your partner"
       });
     }
   };

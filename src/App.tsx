@@ -7,6 +7,7 @@ import { useEffect } from "react";
 import Index from "./pages/Index";
 import Room from "./pages/Room";
 import Auth from "./pages/Auth";
+import Invite from "./pages/Invite";
 import NotFound from "./pages/NotFound";
 import { initializeSecurity } from "@/lib/security";
 
@@ -27,6 +28,7 @@ const App = () => {
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/room/:roomId" element={<Room />} />
+            <Route path="/invite/:roomCode" element={<Invite />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
