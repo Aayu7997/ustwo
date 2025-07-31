@@ -1,14 +1,27 @@
 import { useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { PlaybackState } from './useRoom';
+import { useAuth } from './useAuth';
+
+type SyncEventType = 'play' | 'pause' | 'seek' | 'buffering' | 'loaded';
+
+interface SyncEvent {
+  type: SyncEventType;
+  currentTime: number;
+  isPlaying: boolean;
+  timestamp: number;
+  userId: string;
+}
 
 interface RealtimeSyncProps {
   roomId: string;
   onPlaybackUpdate: (state: PlaybackState) => void;
   onMediaSync: (currentTime: number, isPlaying: boolean) => void;
+  onSyncEvent?: (event: SyncEvent) => void;
 }
 
-export const useRealtimeSync = ({ roomId, onPlaybackUpdate, onMediaSync }: RealtimeSyncProps) => {
+export const useRealtimeSync = ({ roomId, onPlaybackUpdate, onMediaSync, onSyncEvent }: RealtimeSyncProps) => {
+  const { user } = useAuth();
   const channelRef = useRef<any>(null);
 
   useEffect(() => {
@@ -31,6 +44,16 @@ export const useRealtimeSync = ({ roomId, onPlaybackUpdate, onMediaSync }: Realt
           onMediaSync(newState.current_time_seconds, newState.is_playing);
         }
       )
+      .on('broadcast', { event: 'sync_event' }, (payload) => {
+        const event = payload.payload as SyncEvent;
+        console.log('Received sync event:', event);
+        
+        // Don't process our own events
+        if (event.userId === user?.id) return;
+        
+        onSyncEvent?.(event);
+        onMediaSync(event.currentTime, event.isPlaying);
+      })
       .subscribe();
 
     channelRef.current = channel;
@@ -57,7 +80,31 @@ export const useRealtimeSync = ({ roomId, onPlaybackUpdate, onMediaSync }: Realt
     }
   };
 
+  const sendSyncEvent = async (type: SyncEventType, currentTime: number, isPlaying: boolean) => {
+    if (!user || !channelRef.current) return;
+
+    const event: SyncEvent = {
+      type,
+      currentTime,
+      isPlaying,
+      timestamp: Date.now(),
+      userId: user.id
+    };
+
+    try {
+      await channelRef.current.send({
+        type: 'broadcast',
+        event: 'sync_event',
+        payload: event
+      });
+      console.log('Sent sync event:', event);
+    } catch (error) {
+      console.error('Error sending sync event:', error);
+    }
+  };
+
   return {
-    sendPlaybackUpdate
+    sendPlaybackUpdate,
+    sendSyncEvent
   };
 };

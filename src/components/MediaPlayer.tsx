@@ -2,8 +2,10 @@ import React, { useEffect, useRef, useState } from 'react';
 import Plyr from 'plyr';
 import 'plyr/dist/plyr.css';
 import { useRealtimeSync } from '@/hooks/useRealtimeSync';
+import { useRoomPresence } from '@/hooks/useRoomPresence';
 import { PlaybackState } from '@/hooks/useRoom';
 import { useAuth } from '@/hooks/useAuth';
+import { toast } from '@/components/ui/use-toast';
 
 interface MediaPlayerProps {
   roomId: string;
@@ -23,6 +25,7 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
   const syncIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const lastSyncTimeRef = useRef<number>(0);
   const userInitiatedRef = useRef<boolean>(false);
+  const { updateStatus } = useRoomPresence(roomId);
 
   const handlePlaybackUpdate = (state: PlaybackState) => {
     if (!playerRef.current || !user) return;
@@ -67,10 +70,55 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
     userInitiatedRef.current = false;
   };
 
-  const { sendPlaybackUpdate } = useRealtimeSync({
+  const handleSyncEvent = (event: any) => {
+    if (!playerRef.current) return;
+
+    const player = playerRef.current;
+    
+    switch (event.type) {
+      case 'play':
+        if (player.paused) {
+          player.play();
+          toast({
+            title: "Sync Event",
+            description: "Partner started playing",
+          });
+        }
+        break;
+      case 'pause':
+        if (!player.paused) {
+          player.pause();
+          toast({
+            title: "Sync Event", 
+            description: "Partner paused",
+          });
+        }
+        break;
+      case 'seek':
+        const timeDrift = Math.abs(player.currentTime - event.currentTime);
+        if (timeDrift > 1) {
+          player.currentTime = event.currentTime;
+          toast({
+            title: "Sync Event",
+            description: "Partner seeked to new position",
+          });
+        }
+        break;
+      case 'buffering':
+        updateStatus('buffering');
+        toast({
+          title: "Sync Event",
+          description: "Partner is buffering",
+        });
+        break;
+    }
+  };
+
+  const { sendPlaybackUpdate, sendSyncEvent } = useRealtimeSync({
     roomId,
     onPlaybackUpdate: handlePlaybackUpdate,
-    onMediaSync: handleMediaSync
+    onMediaSync: handleMediaSync,
+    onSyncEvent: handleSyncEvent
   });
 
   useEffect(() => {
@@ -107,19 +155,36 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
     player.on('play', () => {
       console.log('Play event');
       userInitiatedRef.current = true;
+      updateStatus('watching');
       sendPlaybackUpdate(player.currentTime, true);
+      sendSyncEvent('play', player.currentTime, true);
     });
 
     player.on('pause', () => {
       console.log('Pause event');
       userInitiatedRef.current = true;
+      updateStatus('paused');
       sendPlaybackUpdate(player.currentTime, false);
+      sendSyncEvent('pause', player.currentTime, false);
     });
 
     player.on('seeked', () => {
       console.log('Seeked event');
       userInitiatedRef.current = true;
       sendPlaybackUpdate(player.currentTime, !player.paused);
+      sendSyncEvent('seek', player.currentTime, !player.paused);
+    });
+
+    player.on('waiting', () => {
+      console.log('Buffering event');
+      updateStatus('buffering');
+      sendSyncEvent('buffering', player.currentTime, !player.paused);
+    });
+
+    player.on('canplay', () => {
+      console.log('Can play event');
+      updateStatus(player.paused ? 'paused' : 'watching');
+      sendSyncEvent('loaded', player.currentTime, !player.paused);
     });
 
     // Sync every 500ms during playback
@@ -156,7 +221,7 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
         player.destroy();
       }
     };
-  }, [roomId, sendPlaybackUpdate]);
+  }, [roomId, sendPlaybackUpdate, sendSyncEvent, updateStatus]);
 
   return (
     <div className="w-full max-w-4xl mx-auto">
