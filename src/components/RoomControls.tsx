@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useRoom, Room } from '@/hooks/useRoom';
 import { useAuth } from '@/hooks/useAuth';
-import { Copy, Heart, Users, Video, Shield } from 'lucide-react';
+import { Copy, Heart, Users, Video, Settings } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
 import { validateRoomName, validateRoomCode, roomRateLimiter } from '@/lib/validation';
+import { CreateRoomModal, JoinRoomModal, VideoCallModal, RoomInfoModal } from './ModalOverlays';
+import { GlowButton, HoverCard } from './AnimatedUI';
+import { PulseEffect, ConnectionStatus } from './AnimationEffects';
 
 interface RoomControlsProps {
   room?: Room | null;
@@ -22,79 +23,25 @@ export const RoomControls: React.FC<RoomControlsProps> = ({
   onRoomCreated
 }) => {
   const { user } = useAuth();
-  const { createRoom, joinRoom, loading } = useRoom();
-  const [roomName, setRoomName] = useState('');
-  const [joinCode, setJoinCode] = useState('');
-  const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [showJoinDialog, setShowJoinDialog] = useState(false);
+  const { loading } = useRoom();
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showJoinModal, setShowJoinModal] = useState(false);
+  const [showVideoModal, setShowVideoModal] = useState(false);
+  const [showInfoModal, setShowInfoModal] = useState(false);
 
-  const handleCreateRoom = async () => {
-    // Rate limiting check
-    if (!roomRateLimiter.isAllowed(user?.id || 'anonymous')) {
-      const remainingTime = Math.ceil(roomRateLimiter.getRemainingTime(user?.id || 'anonymous') / 60000);
-      toast({
-        title: "Too many attempts",
-        description: `Please wait ${remainingTime} minutes before creating another room`,
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Enhanced validation
-    const validation = validateRoomName(roomName);
-    if (!validation.valid) {
-      toast({
-        title: "Invalid Room Name",
-        description: validation.message,
-        variant: "destructive"
-      });
-      return;
-    }
-
-    const newRoom = await createRoom(validation.sanitized);
-    if (newRoom) {
-      setShowCreateDialog(false);
-      setRoomName('');
-      onRoomCreated?.(newRoom);
-    }
+  const handleRoomCreated = (newRoom: Room) => {
+    onRoomCreated?.(newRoom);
   };
 
-  const handleJoinRoom = async () => {
-    // Rate limiting check
-    if (!roomRateLimiter.isAllowed(user?.id || 'anonymous')) {
-      const remainingTime = Math.ceil(roomRateLimiter.getRemainingTime(user?.id || 'anonymous') / 60000);
-      toast({
-        title: "Too many attempts",
-        description: `Please wait ${remainingTime} minutes before trying again`,
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Enhanced validation
-    const validation = validateRoomCode(joinCode);
-    if (!validation.valid) {
-      toast({
-        title: "Invalid Room Code",
-        description: validation.message,
-        variant: "destructive"
-      });
-      return;
-    }
-
-    const joinedRoom = await joinRoom(validation.sanitized);
-    if (joinedRoom) {
-      setShowJoinDialog(false);
-      setJoinCode('');
-      onRoomJoined?.(joinedRoom);
-    }
+  const handleRoomJoined = (joinedRoom: Room) => {
+    onRoomJoined?.(joinedRoom);
   };
 
   const copyRoomCode = () => {
     if (room?.room_code) {
       navigator.clipboard.writeText(room.room_code);
       toast({
-        title: "Copied!",
+        title: "Copied! 💕",
         description: "Room code copied to clipboard"
       });
     }
@@ -113,206 +60,202 @@ export const RoomControls: React.FC<RoomControlsProps> = ({
 
   if (!user) {
     return (
-      <Card className="w-full max-w-md mx-auto">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Heart className="w-5 h-5 text-pink-500" />
-            UsTwo
-          </CardTitle>
-          <CardDescription>
-            Please sign in to create or join a room
-          </CardDescription>
-        </CardHeader>
-      </Card>
+      <HoverCard className="w-full max-w-md mx-auto">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Heart className="w-5 h-5 text-pink-500" />
+              UsTwo
+            </CardTitle>
+            <CardDescription>
+              Please sign in to create or join a room
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </HoverCard>
     );
   }
 
   if (room) {
     return (
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-2xl mx-auto"
-      >
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Heart className="w-5 h-5 text-pink-500" />
-                {room.name}
-              </div>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Users className="w-4 h-4" />
-                {room.partner_id ? '2 connected' : '1 waiting'}
-              </div>
-            </CardTitle>
-            <CardDescription>
-              Room Code: <span className="font-mono font-bold">{room.room_code}</span>
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={copyRoomCode}
-                className="flex items-center gap-2"
-              >
-                <Copy className="w-4 h-4" />
-                Copy Code
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={copyRoomLink}
-                className="flex items-center gap-2"
-              >
-                <Copy className="w-4 h-4" />
-                Copy Link
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex items-center gap-2"
-                disabled
-              >
-                <Video className="w-4 h-4" />
-                Video Call (Coming Soon)
-              </Button>
-            </div>
-            
-            {!room.partner_id && (
-              <div className="p-4 bg-muted rounded-lg">
-                <p className="text-sm text-muted-foreground">
-                  Waiting for your partner to join... Share the room code or link with them!
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </motion.div>
+      <>
+        <ConnectionStatus 
+          isConnected={!!room.partner_id} 
+          isWatching={true}
+        />
+        
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="w-full max-w-2xl mx-auto"
+        >
+          <PulseEffect isActive={!!room.partner_id}>
+            <HoverCard>
+              <Card className="border-2 border-pink-200 dark:border-pink-800">
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Heart className="w-5 h-5 text-pink-500 fill-current" />
+                      {room.name}
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Users className="w-4 h-4" />
+                      {room.partner_id ? '2 connected' : '1 waiting'}
+                    </div>
+                  </CardTitle>
+                  <CardDescription>
+                    Room Code: <span className="font-mono font-bold text-primary">{room.room_code}</span>
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    <GlowButton
+                      onClick={copyRoomCode}
+                      variant="outline"
+                      size="sm"
+                      className="flex items-center gap-2 justify-center"
+                    >
+                      <Copy className="w-4 h-4" />
+                      Copy Code
+                    </GlowButton>
+                    <GlowButton
+                      onClick={copyRoomLink}
+                      variant="outline"
+                      size="sm"
+                      className="flex items-center gap-2 justify-center"
+                    >
+                      <Heart className="w-4 h-4" />
+                      Share Link
+                    </GlowButton>
+                    <GlowButton
+                      onClick={() => setShowVideoModal(true)}
+                      variant="secondary"
+                      size="sm"
+                      className="flex items-center gap-2 justify-center"
+                    >
+                      <Video className="w-4 h-4" />
+                      Video Call
+                    </GlowButton>
+                    <GlowButton
+                      onClick={() => setShowInfoModal(true)}
+                      variant="outline"
+                      size="sm"
+                      className="flex items-center gap-2 justify-center"
+                    >
+                      <Settings className="w-4 h-4" />
+                      Room Info
+                    </GlowButton>
+                  </div>
+                  
+                  {!room.partner_id && (
+                    <motion.div 
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="p-4 bg-gradient-to-r from-pink-50 to-purple-50 dark:from-pink-950 dark:to-purple-950 rounded-lg border border-dashed border-pink-300 dark:border-pink-700"
+                    >
+                      <div className="text-center space-y-2">
+                        <motion.div
+                          animate={{ scale: [1, 1.1, 1] }}
+                          transition={{ duration: 2, repeat: Infinity }}
+                        >
+                          <Heart className="w-6 h-6 mx-auto text-pink-500 fill-current" />
+                        </motion.div>
+                        <p className="text-sm font-medium">Waiting for your partner...</p>
+                        <p className="text-xs text-muted-foreground">
+                          Share the room code or link to start watching together!
+                        </p>
+                      </div>
+                    </motion.div>
+                  )}
+                </CardContent>
+              </Card>
+            </HoverCard>
+          </PulseEffect>
+        </motion.div>
+
+        <VideoCallModal 
+          isOpen={showVideoModal}
+          onClose={() => setShowVideoModal(false)}
+          roomId={room.id}
+          isConnected={!!room.partner_id}
+        />
+
+        <RoomInfoModal 
+          isOpen={showInfoModal}
+          onClose={() => setShowInfoModal(false)}
+          room={room}
+        />
+      </>
     );
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="w-full max-w-md mx-auto space-y-4"
-    >
-      <Card>
-        <CardHeader className="text-center">
-          <CardTitle className="flex items-center justify-center gap-2">
-            <Heart className="w-6 h-6 text-pink-500" />
-            Welcome to UsTwo
-          </CardTitle>
-          <CardDescription>
-            Create a private room to watch together with your partner
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-            <DialogTrigger asChild>
-              <Button className="w-full" size="lg">
+    <>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="w-full max-w-md mx-auto space-y-4"
+      >
+        <HoverCard>
+          <Card className="border-2 border-dashed border-primary/20 hover:border-primary/40 transition-colors">
+            <CardHeader className="text-center">
+              <CardTitle className="flex items-center justify-center gap-2">
+                <motion.div
+                  animate={{ scale: [1, 1.1, 1] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                >
+                  <Heart className="w-6 h-6 text-pink-500 fill-current" />
+                </motion.div>
+                Welcome to UsTwo
+              </CardTitle>
+              <CardDescription>
+                Create a private room to watch together with your partner
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <GlowButton 
+                onClick={() => setShowCreateModal(true)}
+                className="w-full"
+                size="lg"
+              >
                 Create Room
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Create a New Room</DialogTitle>
-                <DialogDescription>
-                  Give your room a romantic name that you and your partner will recognize
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div className="relative">
-                  <Input
-                    placeholder="Enter room name (e.g., 'Our Movie Night')"
-                    value={roomName}
-                    onChange={(e) => setRoomName(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handleCreateRoom()}
-                    maxLength={50}
-                  />
-                  <Shield className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              </GlowButton>
+
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t border-dashed" />
                 </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    className="flex-1"
-                    onClick={() => setShowCreateDialog(false)}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    className="flex-1"
-                    onClick={handleCreateRoom}
-                    disabled={loading || !roomName.trim()}
-                  >
-                    {loading ? 'Creating...' : 'Create Room'}
-                  </Button>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">
+                    or
+                  </span>
                 </div>
               </div>
-            </DialogContent>
-          </Dialog>
 
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">
-                or
-              </span>
-            </div>
-          </div>
-
-          <Dialog open={showJoinDialog} onOpenChange={setShowJoinDialog}>
-            <DialogTrigger asChild>
-              <Button variant="outline" className="w-full" size="lg">
+              <GlowButton 
+                onClick={() => setShowJoinModal(true)}
+                variant="secondary" 
+                className="w-full" 
+                size="lg"
+              >
                 Join Room
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Join Your Partner's Room</DialogTitle>
-                <DialogDescription>
-                  Enter the room code your partner shared with you
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div className="relative">
-                  <Input
-                    placeholder="Enter room code (e.g., ABC123)"
-                    value={joinCode}
-                    onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                    onKeyPress={(e) => e.key === 'Enter' && handleJoinRoom()}
-                    className="font-mono text-center text-lg tracking-widest pr-10"
-                    maxLength={6}
-                    pattern="[A-Z0-9]{6}"
-                  />
-                  <Shield className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    className="flex-1"
-                    onClick={() => setShowJoinDialog(false)}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    className="flex-1"
-                    onClick={handleJoinRoom}
-                    disabled={loading || !joinCode.trim()}
-                  >
-                    {loading ? 'Joining...' : 'Join Room'}
-                  </Button>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
-        </CardContent>
-      </Card>
-    </motion.div>
+              </GlowButton>
+            </CardContent>
+          </Card>
+        </HoverCard>
+      </motion.div>
+
+      <CreateRoomModal 
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onRoomCreated={handleRoomCreated}
+      />
+
+      <JoinRoomModal 
+        isOpen={showJoinModal}
+        onClose={() => setShowJoinModal(false)}
+        onRoomJoined={handleRoomJoined}
+      />
+    </>
   );
 };
