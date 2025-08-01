@@ -94,6 +94,22 @@ All colors MUST be HSL.
   }
 }
 
+/* Theme Animations */
+@keyframes fadeInOut {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.8; }
+}
+
+@keyframes glow {
+  0%, 100% { box-shadow: 0 0 20px rgba(217, 119, 6, 0.3); }
+  50% { box-shadow: 0 0 40px rgba(217, 119, 6, 0.6); }
+}
+
+@keyframes breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
 @layer base {
   * {
     @apply border-border;

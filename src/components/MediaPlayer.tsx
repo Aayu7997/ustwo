@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import Plyr from 'plyr';
 import 'plyr/dist/plyr.css';
 import { useRealtimeSync } from '@/hooks/useRealtimeSync';
+import { useSmartSync } from '@/hooks/useSmartSync';
 import { useRoomPresence } from '@/hooks/useRoomPresence';
 import { PlaybackState } from '@/hooks/useRoom';
 import { useAuth } from '@/hooks/useAuth';
@@ -121,6 +122,16 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
     onSyncEvent: handleSyncEvent
   });
 
+  const { metrics, isAutoSyncing, onBuffering, updateSyncTime } = useSmartSync(
+    (targetTime) => {
+      if (playerRef.current) {
+        playerRef.current.currentTime = targetTime;
+      }
+    },
+    () => playerRef.current?.currentTime || 0,
+    !playerRef.current?.paused
+  );
+
   useEffect(() => {
     if (!videoRef.current) return;
 
@@ -173,11 +184,13 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
       userInitiatedRef.current = true;
       sendPlaybackUpdate(player.currentTime, !player.paused);
       sendSyncEvent('seek', player.currentTime, !player.paused);
+      updateSyncTime(player.currentTime);
     });
 
     player.on('waiting', () => {
       console.log('Buffering event');
       updateStatus('buffering');
+      onBuffering();
       sendSyncEvent('buffering', player.currentTime, !player.paused);
     });
 

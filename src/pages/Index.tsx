@@ -7,6 +7,8 @@ import { RoomControls } from '@/components/RoomControls';
 import { SharedCalendar } from '@/components/SharedCalendar';
 import { NotesTimeline } from '@/components/NotesTimeline';
 import { LoveMeter } from '@/components/LoveMeter';
+import { MovieRecommendations } from '@/components/MovieRecommendations';
+import { ThemeSelector } from '@/components/ThemeSelector';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Heart, LogOut } from 'lucide-react';
@@ -118,11 +120,13 @@ const Index = () => {
             transition={{ delay: 0.4 }}
           >
             <Tabs defaultValue="rooms" className="w-full">
-              <TabsList className="grid w-full grid-cols-4 mb-8">
+              <TabsList className="grid w-full grid-cols-6 mb-8">
                 <TabsTrigger value="rooms">Rooms</TabsTrigger>
                 <TabsTrigger value="calendar">Calendar</TabsTrigger>
                 <TabsTrigger value="notes">Notes</TabsTrigger>
                 <TabsTrigger value="stats">Love Meter</TabsTrigger>
+                <TabsTrigger value="recommendations">AI Movies</TabsTrigger>
+                <TabsTrigger value="themes">Themes</TabsTrigger>
               </TabsList>
 
               <TabsContent value="rooms" className="space-y-6">
@@ -184,6 +188,14 @@ const Index = () => {
 
               <TabsContent value="stats">
                 <LoveMeter partnerId={currentRoom?.partner_id} />
+              </TabsContent>
+
+              <TabsContent value="recommendations">
+                <MovieRecommendations />
+              </TabsContent>
+
+              <TabsContent value="themes">
+                <ThemeSelector />
               </TabsContent>
             </Tabs>
           </motion.div>
