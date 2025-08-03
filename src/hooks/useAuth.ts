@@ -9,18 +9,19 @@ export const useAuth = () => {
 
   useEffect(() => {
     let mounted = true;
+    let sessionInitialized = false;
 
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         if (!mounted) return;
         
-        console.log('Auth state changed:', event, session?.user?.id);
-        
-        // Handle all auth events uniformly
-        setSession(session);
-        setUser(session?.user ?? null);
-        setLoading(false);
+        // Only update state if this isn't the initial session load
+        if (sessionInitialized || event !== 'INITIAL_SESSION') {
+          setSession(session);
+          setUser(session?.user ?? null);
+          setLoading(false);
+        }
       }
     );
 
@@ -32,21 +33,20 @@ export const useAuth = () => {
         if (!mounted) return;
         
         if (error) {
-          console.warn('Auth error on init:', error);
           setSession(null);
           setUser(null);
         } else {
           setSession(session);
           setUser(session?.user ?? null);
         }
+        
+        sessionInitialized = true;
+        setLoading(false);
       } catch (error) {
-        console.warn('Failed to get session:', error);
         if (mounted) {
           setSession(null);
           setUser(null);
-        }
-      } finally {
-        if (mounted) {
+          sessionInitialized = true;
           setLoading(false);
         }
       }
