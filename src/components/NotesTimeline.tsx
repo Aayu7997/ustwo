@@ -16,16 +16,25 @@ interface NotesTimelineProps {
 
 export const NotesTimeline: React.FC<NotesTimelineProps> = ({ partnerId }) => {
   const { user } = useAuth();
-  const { notes, loading, sendNote, markAsRead, unreadCount } = useNotes(partnerId);
+  const { notes, loading, sendNote, markAsRead, unreadCount, partnerId: effectivePartnerId } = useNotes(partnerId);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [newNote, setNewNote] = useState('');
 
   const handleSendNote = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!newNote.trim() || !partnerId) return;
+    const targetPartnerId = effectivePartnerId;
+    
+    if (!newNote.trim()) {
+      return;
+    }
+    
+    if (!targetPartnerId) {
+      // Show helpful message if no partner found
+      return;
+    }
 
-    const result = await sendNote(newNote.trim(), partnerId);
+    const result = await sendNote(newNote.trim(), targetPartnerId);
     
     if (result) {
       setNewNote('');
@@ -88,10 +97,14 @@ export const NotesTimeline: React.FC<NotesTimelineProps> = ({ partnerId }) => {
                   required
                 />
                 
-                <Button type="submit" className="w-full" disabled={!newNote.trim()}>
-                  <Send className="w-4 h-4 mr-2" />
-                  Send Love Note
-                </Button>
+              <Button 
+                type="submit" 
+                className="w-full" 
+                disabled={!newNote.trim() || !effectivePartnerId}
+              >
+                <Send className="w-4 h-4 mr-2" />
+                {effectivePartnerId ? 'Send Love Note' : 'No Partner Found'}
+              </Button>
               </form>
             </DialogContent>
           </Dialog>
@@ -174,8 +187,17 @@ export const NotesTimeline: React.FC<NotesTimelineProps> = ({ partnerId }) => {
         ) : (
           <div className="text-center py-8 text-muted-foreground">
             <MessageSquare className="w-12 h-12 mx-auto mb-2 opacity-50" />
-            <p>No notes yet</p>
-            <p className="text-sm">Start your love story timeline!</p>
+            {effectivePartnerId ? (
+              <>
+                <p>No notes yet</p>
+                <p className="text-sm">Start your love story timeline!</p>
+              </>
+            ) : (
+              <>
+                <p>No partner found</p>
+                <p className="text-sm">Create or join a room together first to start sending notes!</p>
+              </>
+            )}
           </div>
         )}
       </CardContent>

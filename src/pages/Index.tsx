@@ -183,7 +183,7 @@ const Index = () => {
               </TabsContent>
 
               <TabsContent value="notes">
-                <NotesTimeline partnerId={currentRoom?.partner_id} />
+                <NotesTimeline />
               </TabsContent>
 
               <TabsContent value="stats">

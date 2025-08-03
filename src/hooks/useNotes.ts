@@ -16,6 +16,34 @@ export const useNotes = (partnerId?: string) => {
   const { user } = useAuth();
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(false);
+  const [detectedPartnerId, setDetectedPartnerId] = useState<string | null>(null);
+
+  const findPartnerFromRooms = async () => {
+    if (!user) return null;
+
+    try {
+      const { data: rooms, error } = await supabase
+        .from('rooms')
+        .select('creator_id, partner_id')
+        .or(`creator_id.eq.${user.id},partner_id.eq.${user.id}`)
+        .not('partner_id', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (error) throw error;
+
+      if (rooms && rooms.length > 0) {
+        const room = rooms[0];
+        const partnerId = room.creator_id === user.id ? room.partner_id : room.creator_id;
+        setDetectedPartnerId(partnerId);
+        return partnerId;
+      }
+      return null;
+    } catch (error) {
+      console.error('Error finding partner:', error);
+      return null;
+    }
+  };
 
   const fetchNotes = async () => {
     if (!user) return;
@@ -30,6 +58,11 @@ export const useNotes = (partnerId?: string) => {
 
       if (error) throw error;
       setNotes(data || []);
+
+      // If no partner ID provided, try to find one from rooms
+      if (!partnerId && !detectedPartnerId) {
+        await findPartnerFromRooms();
+      }
     } catch (error: any) {
       console.error('Error fetching notes:', error);
       toast({
@@ -43,13 +76,40 @@ export const useNotes = (partnerId?: string) => {
   };
 
   const sendNote = async (content: string, receiverId: string) => {
-    if (!user) return null;
+    if (!user) {
+      toast({
+        title: "Error",
+        description: "You must be logged in to send notes",
+        variant: "destructive"
+      });
+      return null;
+    }
+
+    if (!content.trim()) {
+      toast({
+        title: "Error",
+        description: "Note content cannot be empty",
+        variant: "destructive"
+      });
+      return null;
+    }
+
+    if (!receiverId) {
+      toast({
+        title: "Error",
+        description: "No partner found to send note to",
+        variant: "destructive"
+      });
+      return null;
+    }
 
     try {
+      console.log('Sending note from', user.id, 'to', receiverId, 'content:', content.trim());
+      
       const { data, error } = await supabase
         .from('notes')
         .insert({
-          content,
+          content: content.trim(),
           sender_id: user.id,
           receiver_id: receiverId,
           is_read: false
@@ -57,12 +117,17 @@ export const useNotes = (partnerId?: string) => {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Note insertion error:', error);
+        throw error;
+      }
 
+      console.log('Note sent successfully:', data);
+      
       setNotes(prev => [data, ...prev]);
       toast({
-        title: "Note Sent",
-        description: "Your love note has been delivered 💕"
+        title: "Note Sent! 💕",
+        description: "Your love note has been delivered"
       });
 
       return data;
@@ -70,7 +135,7 @@ export const useNotes = (partnerId?: string) => {
       console.error('Error sending note:', error);
       toast({
         title: "Error",
-        description: "Failed to send note",
+        description: error.message || "Failed to send note",
         variant: "destructive"
       });
       return null;
@@ -129,12 +194,17 @@ export const useNotes = (partnerId?: string) => {
     };
   }, [user]);
 
+  const getEffectivePartnerId = () => {
+    return partnerId || detectedPartnerId;
+  };
+
   return {
     notes,
     loading,
     sendNote,
     markAsRead,
     unreadCount: getUnreadCount(),
-    refetch: fetchNotes
+    refetch: fetchNotes,
+    partnerId: getEffectivePartnerId()
   };
 };

@@ -44,37 +44,50 @@ export const useRoom = (roomId?: string) => {
 
     setLoading(true);
     try {
+      console.log('Creating room with name:', name, 'for user:', user.id);
+      
       const { data, error } = await supabase
         .from('rooms')
         .insert({
-          name,
+          name: name.trim(),
           creator_id: user.id
         })
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Room creation error:', error);
+        throw error;
+      }
+
+      console.log('Room created successfully:', data);
 
       // Create initial playback state
-      await supabase
+      const { error: playbackError } = await supabase
         .from('playback_state')
         .insert({
           room_id: data.id,
           current_time_seconds: 0,
-          is_playing: false
+          is_playing: false,
+          last_updated_by: user.id
         });
+
+      if (playbackError) {
+        console.error('Playback state creation error:', playbackError);
+      }
 
       setRoom(data);
       toast({
-        title: "Room Created",
+        title: "Room Created! 💕",
         description: `Room "${name}" created with code: ${data.room_code}`
       });
       
       return data;
     } catch (error: any) {
+      console.error('Create room failed:', error);
       toast({
         title: "Error",
-        description: error.message,
+        description: error.message || "Failed to create room",
         variant: "destructive"
       });
       return null;
@@ -93,38 +106,88 @@ export const useRoom = (roomId?: string) => {
       return null;
     }
 
+    const trimmedCode = roomCode.trim().toUpperCase();
+    if (!trimmedCode) {
+      toast({
+        title: "Error",
+        description: "Please enter a valid room code",
+        variant: "destructive"
+      });
+      return null;
+    }
+
     setLoading(true);
     try {
+      console.log('Looking for room with code:', trimmedCode);
+      
       // Find room by code
       const { data: roomData, error: roomError } = await supabase
         .from('rooms')
         .select('*')
-        .eq('room_code', roomCode.toUpperCase())
-        .single();
+        .eq('room_code', trimmedCode)
+        .maybeSingle();
 
-      if (roomError) throw new Error('Room not found');
+      if (roomError) {
+        console.error('Room search error:', roomError);
+        throw roomError;
+      }
 
-      // Update room with partner
-      const { data: updatedRoom, error: updateError } = await supabase
-        .from('rooms')
-        .update({ partner_id: user.id })
-        .eq('id', roomData.id)
-        .select()
-        .single();
+      if (!roomData) {
+        throw new Error('Room not found with that code');
+      }
 
-      if (updateError) throw updateError;
+      console.log('Found room:', roomData);
 
-      setRoom(updatedRoom);
-      toast({
-        title: "Joined Room",
-        description: `Welcome to "${updatedRoom.name}"`
-      });
-      
-      return updatedRoom;
+      // Check if user is already the creator
+      if (roomData.creator_id === user.id) {
+        setRoom(roomData);
+        toast({
+          title: "Welcome Back! 💕",
+          description: `You're already the creator of "${roomData.name}"`
+        });
+        return roomData;
+      }
+
+      // Check if room already has a partner
+      if (roomData.partner_id && roomData.partner_id !== user.id) {
+        throw new Error('This room is already full');
+      }
+
+      // Update room with partner if not already set
+      if (!roomData.partner_id) {
+        const { data: updatedRoom, error: updateError } = await supabase
+          .from('rooms')
+          .update({ partner_id: user.id })
+          .eq('id', roomData.id)
+          .select()
+          .single();
+
+        if (updateError) {
+          console.error('Room update error:', updateError);
+          throw updateError;
+        }
+
+        setRoom(updatedRoom);
+        toast({
+          title: "Joined Room! 💕",
+          description: `Welcome to "${updatedRoom.name}"`
+        });
+        
+        return updatedRoom;
+      } else {
+        // User is already the partner
+        setRoom(roomData);
+        toast({
+          title: "Welcome Back! 💕",
+          description: `You're already in "${roomData.name}"`
+        });
+        return roomData;
+      }
     } catch (error: any) {
+      console.error('Join room failed:', error);
       toast({
         title: "Error",
-        description: error.message,
+        description: error.message || "Failed to join room",
         variant: "destructive"
       });
       return null;
