@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { toast } from '@/components/ui/use-toast';
@@ -215,7 +215,7 @@ export const useRoom = (roomId?: string) => {
     }
   };
 
-  const fetchRoom = async (id: string) => {
+  const fetchRoom = useCallback(async (id: string) => {
     setLoading(true);
     try {
       const { data, error } = await supabase
@@ -250,15 +250,15 @@ export const useRoom = (roomId?: string) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const fetchPlaybackState = async (roomId: string) => {
+  const fetchPlaybackState = useCallback(async (roomId: string) => {
     try {
       const { data, error } = await supabase
         .from('playback_state')
         .select('*')
         .eq('room_id', roomId)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
       setPlaybackState(data);
@@ -267,7 +267,7 @@ export const useRoom = (roomId?: string) => {
       console.error('Error fetching playback state:', error);
       return null;
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (roomId) {

@@ -18,19 +18,15 @@ const Room: React.FC = () => {
   const [currentRoom, setCurrentRoom] = useState<RoomType | null>(null);
 
   useEffect(() => {
-    if (roomId && !authLoading) {
-      if (!user) {
-        navigate('/auth');
-        return;
-      }
+    if (roomId && !authLoading && user) {
       fetchRoom(roomId);
+    } else if (roomId && !authLoading && !user) {
+      navigate('/auth');
     }
   }, [roomId, user, authLoading, fetchRoom, navigate]);
 
   useEffect(() => {
-    if (room) {
-      setCurrentRoom(room);
-    }
+    setCurrentRoom(room);
   }, [room]);
 
   if (authLoading || loading) {
