@@ -122,15 +122,15 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
     onSyncEvent: handleSyncEvent
   });
 
-  const { metrics, isAutoSyncing, onBuffering, updateSyncTime } = useSmartSync(
-    (targetTime) => {
+  const { metrics, isAutoSyncing, onBuffering, updateSyncTime } = useSmartSync({
+    onResync: () => {
       if (playerRef.current) {
-        playerRef.current.currentTime = targetTime;
+        playerRef.current.currentTime = playerRef.current.currentTime;
       }
     },
-    () => playerRef.current?.currentTime || 0,
-    !playerRef.current?.paused
-  );
+    getCurrentTime: () => playerRef.current?.currentTime || 0,
+    isPlaying: () => !playerRef.current?.paused
+  });
 
   useEffect(() => {
     if (!videoRef.current) return;

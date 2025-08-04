@@ -3,7 +3,11 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useRoom, Room as RoomType } from '@/hooks/useRoom';
 import { useAuth } from '@/hooks/useAuth';
-import { MediaPlayer } from '@/components/MediaPlayer';
+import { EnhancedMediaPlayer } from '@/components/EnhancedMediaPlayer';
+import { FloatingHearts } from '@/components/FloatingHearts';
+import { ChatWidget } from '@/components/ChatWidget';
+import { WatchPartyEffects } from '@/components/WatchPartyEffects';
+import { ExtensionBridge } from '@/components/ExtensionBridge';
 import { RoomControls } from '@/components/RoomControls';
 import { VideoCall } from '@/components/VideoCall';
 import { PartnerPresence } from '@/components/PartnerPresence';
@@ -16,6 +20,9 @@ const Room: React.FC = () => {
   const { user, loading: authLoading } = useAuth();
   const { room, fetchRoom, loading } = useRoom();
   const [currentRoom, setCurrentRoom] = useState<RoomType | null>(null);
+  const [heartTrigger, setHeartTrigger] = useState(false);
+  const [playbackState, setPlaybackState] = useState({ isPlaying: false, currentTime: 0 });
+  const [chatMinimized, setChatMinimized] = useState(false);
 
   useEffect(() => {
     if (roomId && !authLoading && user) {
@@ -121,10 +128,54 @@ const Room: React.FC = () => {
                 All play, pause, seek, and buffering events are shared in real-time.
               </p>
             </div>
-            <MediaPlayer roomId={roomId} />
+            <EnhancedMediaPlayer 
+              roomId={roomId} 
+              onPlaybackStateChange={(state) => {
+                setPlaybackState({
+                  isPlaying: state.is_playing || false,
+                  currentTime: state.current_time_seconds || 0
+                });
+              }}
+            />
+          </motion.div>
+        )}
+
+        {/* Extension Bridge for OTT Sync */}
+        {roomId && currentRoom && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5 }}
+          >
+            <ExtensionBridge 
+              roomId={roomId} 
+              roomCode={currentRoom.room_code || ''} 
+            />
           </motion.div>
         )}
       </div>
+      
+      {/* Chat Widget */}
+      {roomId && (
+        <ChatWidget 
+          roomId={roomId}
+          isMinimized={chatMinimized}
+          onToggleMinimize={() => setChatMinimized(!chatMinimized)}
+        />
+      )}
+      
+      {/* Watch Party Effects */}
+      {roomId && (
+        <WatchPartyEffects
+          isPlaying={playbackState.isPlaying}
+          currentTime={playbackState.currentTime}
+          partnerJoined={!!currentRoom?.partner_id}
+          onSyncEvent={(event) => console.log('Sync event:', event)}
+        />
+      )}
+      
+      {/* Floating Hearts */}
+      <FloatingHearts trigger={heartTrigger} />
     </motion.div>
   );
 };

@@ -8,11 +8,17 @@ interface SyncMetrics {
   syncDrift: number;
 }
 
-export const useSmartSync = (
-  onResync: (targetTime: number) => void,
-  getCurrentTime: () => number,
-  isPlaying: boolean
-) => {
+interface UseSmartSyncProps {
+  onResync: () => void;
+  getCurrentTime: () => number;
+  isPlaying: () => boolean;
+}
+
+export const useSmartSync = ({
+  onResync,
+  getCurrentTime,
+  isPlaying
+}: UseSmartSyncProps) => {
   const [metrics, setMetrics] = useState<SyncMetrics>({
     latency: 0,
     jitter: 0,
@@ -44,7 +50,7 @@ export const useSmartSync = (
           description: "Correcting playback drift...",
         });
         
-        onResync(expectedTime);
+        onResync();
         
         setTimeout(() => setIsAutoSyncing(false), 2000);
       }

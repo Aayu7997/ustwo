@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { PlaybackState } from './useRoom';
 import { useAuth } from './useAuth';
 
-type SyncEventType = 'play' | 'pause' | 'seek' | 'buffering' | 'loaded';
+type SyncEventType = 'play' | 'pause' | 'seek' | 'buffering' | 'loaded' | 'heart';
 
 interface SyncEvent {
   type: SyncEventType;
