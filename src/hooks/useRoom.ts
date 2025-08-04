@@ -222,15 +222,28 @@ export const useRoom = (roomId?: string) => {
         .from('rooms')
         .select('*')
         .eq('id', id)
-        .single();
+        .maybeSingle();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching room:', error);
+        throw error;
+      }
+
+      if (!data) {
+        console.log('Room not found or no access:', id);
+        setRoom(null);
+        return null;
+      }
+
+      console.log('Room fetched successfully:', data);
       setRoom(data);
       return data;
     } catch (error: any) {
+      console.error('fetchRoom error:', error);
+      setRoom(null);
       toast({
         title: "Error",
-        description: error.message,
+        description: error.message || "Failed to load room",
         variant: "destructive"
       });
       return null;
