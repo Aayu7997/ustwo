@@ -42,16 +42,11 @@ export const useSmartSync = ({
 
       setMetrics(prev => ({ ...prev, syncDrift: drift }));
 
-      // Auto-resync if drift is too high (>2 seconds)
+      // Auto-resync if drift is too high (>2 seconds) - Silent operation
       if (drift > 2 && !isAutoSyncing) {
         setIsAutoSyncing(true);
-        toast({
-          title: "Auto-Sync Active",
-          description: "Correcting playback drift...",
-        });
-        
+        // Silent sync without popup notifications
         onResync();
-        
         setTimeout(() => setIsAutoSyncing(false), 2000);
       }
     }, 1000);
@@ -92,13 +87,9 @@ export const useSmartSync = ({
       bufferingEvents: bufferingCountRef.current
     }));
 
-    // Predict if reconnection is needed
+    // Silent handling of connection issues
     if (bufferingCountRef.current > 3) {
-      toast({
-        title: "Connection Issues Detected",
-        description: "Smart sync will handle reconnection automatically",
-        variant: "destructive"
-      });
+      console.log('Connection issues detected, handling automatically');
     }
   };
 

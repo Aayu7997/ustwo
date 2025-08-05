@@ -9,6 +9,7 @@ import { useRealtimeSync } from '@/hooks/useRealtimeSync';
 import { useSmartSync } from '@/hooks/useSmartSync';
 import { useRoomPresence } from '@/hooks/useRoomPresence';
 import { MediaSourceSelector } from './MediaSourceSelector';
+import { FileUploadHandler } from './FileUploadHandler';
 import { 
   Play, 
   Pause, 

@@ -39,20 +39,33 @@ All colors MUST be HSL.
     --radius: 0.5rem;
 
     --sidebar-background: 0 0% 98%;
-
     --sidebar-foreground: 240 5.3% 26.1%;
-
     --sidebar-primary: 240 5.9% 10%;
-
     --sidebar-primary-foreground: 0 0% 98%;
-
     --sidebar-accent: 240 4.8% 95.9%;
-
     --sidebar-accent-foreground: 240 5.9% 10%;
-
     --sidebar-border: 220 13% 91%;
-
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Enhanced Theme System */
+    --theme-sunset: 25 95% 53%;
+    --theme-ocean: 210 98% 78%;
+    --theme-forest: 142 76% 36%;
+    --theme-neon: 275 100% 65%;
+    --theme-cozy: 35 77% 49%;
+    
+    /* Gradients */
+    --gradient-sunset: linear-gradient(135deg, hsl(25 95% 53%), hsl(45 98% 63%));
+    --gradient-ocean: linear-gradient(135deg, hsl(210 98% 78%), hsl(200 85% 60%));
+    --gradient-forest: linear-gradient(135deg, hsl(142 76% 36%), hsl(120 60% 50%));
+    --gradient-neon: linear-gradient(135deg, hsl(275 100% 65%), hsl(285 85% 70%));
+    --gradient-cozy: linear-gradient(135deg, hsl(35 77% 49%), hsl(25 85% 60%));
+    
+    /* Love-themed colors */
+    --love-pink: 330 81% 60%;
+    --love-red: 348 83% 47%;
+    --love-purple: 300 47% 60%;
+    --heart-glow: 0 0 20px hsl(330 81% 60% / 0.6);
   }
 
   .dark {

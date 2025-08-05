@@ -61,6 +61,20 @@ export default {
 					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
+				},
+				// Theme system colors
+				theme: {
+					sunset: 'hsl(var(--theme-sunset))',
+					ocean: 'hsl(var(--theme-ocean))',
+					forest: 'hsl(var(--theme-forest))',
+					neon: 'hsl(var(--theme-neon))',
+					cozy: 'hsl(var(--theme-cozy))'
+				},
+				// Love-themed colors
+				love: {
+					pink: 'hsl(var(--love-pink))',
+					red: 'hsl(var(--love-red))',
+					purple: 'hsl(var(--love-purple))'
 				}
 			},
 			borderRadius: {

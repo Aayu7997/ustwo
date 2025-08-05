@@ -9,7 +9,7 @@ import { ChatWidget } from '@/components/ChatWidget';
 import { WatchPartyEffects } from '@/components/WatchPartyEffects';
 import { ExtensionBridge } from '@/components/ExtensionBridge';
 import { RoomControls } from '@/components/RoomControls';
-import { VideoCall } from '@/components/VideoCall';
+import { EnhancedVideoCall } from '@/components/EnhancedVideoCall';
 import { PartnerPresence } from '@/components/PartnerPresence';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Heart } from 'lucide-react';
@@ -109,7 +109,7 @@ const Room: React.FC = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
           >
-            <VideoCall roomId={roomId} />
+            <EnhancedVideoCall roomId={roomId} />
           </motion.div>
         )}
 

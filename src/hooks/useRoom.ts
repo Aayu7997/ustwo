@@ -215,14 +215,24 @@ export const useRoom = (roomId?: string) => {
     }
   };
 
-  const fetchRoom = useCallback(async (id: string) => {
+  const fetchRoom = useCallback(async (identifier: string) => {
+    if (!user) return null;
+    
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('rooms')
-        .select('*')
-        .eq('id', id)
-        .maybeSingle();
+      let query = supabase.from('rooms').select('*');
+      
+      // Check if identifier is a UUID (room ID) or room code
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(identifier);
+      
+      if (isUUID) {
+        query = query.eq('id', identifier);
+      } else {
+        // Treat as room code
+        query = query.eq('room_code', identifier.toUpperCase());
+      }
+      
+      const { data, error } = await query.maybeSingle();
 
       if (error) {
         console.error('Error fetching room:', error);
@@ -230,7 +240,14 @@ export const useRoom = (roomId?: string) => {
       }
 
       if (!data) {
-        console.log('Room not found or no access:', id);
+        console.log('Room not found:', identifier);
+        setRoom(null);
+        return null;
+      }
+
+      // Check if user has access to this room
+      if (data.creator_id !== user.id && data.partner_id !== user.id) {
+        console.log('User does not have access to room:', data.id);
         setRoom(null);
         return null;
       }
@@ -250,7 +267,7 @@ export const useRoom = (roomId?: string) => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user]);
 
   const fetchPlaybackState = useCallback(async (roomId: string) => {
     try {

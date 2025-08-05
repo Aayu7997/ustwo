@@ -23,21 +23,42 @@ export const useWebRTC = ({ roomId, enabled }: WebRTCProps) => {
   const initializeMedia = useCallback(async () => {
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 640, height: 480 },
-        audio: true
+        video: { 
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          facingMode: 'user'
+        },
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        }
       });
       setStream(mediaStream);
       
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = mediaStream;
+        localVideoRef.current.muted = true; // Prevent feedback
       }
       
       return mediaStream;
     } catch (error) {
       console.error('Failed to get media:', error);
+      let errorMessage = "Failed to access camera/microphone";
+      
+      if (error instanceof Error) {
+        if (error.name === 'NotAllowedError') {
+          errorMessage = "Camera/microphone access denied. Please allow permissions.";
+        } else if (error.name === 'NotFoundError') {
+          errorMessage = "No camera/microphone found.";
+        } else if (error.name === 'NotReadableError') {
+          errorMessage = "Camera/microphone is already in use.";
+        }
+      }
+      
       toast({
         title: "Camera Access",
-        description: "Failed to access camera/microphone",
+        description: errorMessage,
         variant: "destructive"
       });
       throw error;
@@ -48,23 +69,31 @@ export const useWebRTC = ({ roomId, enabled }: WebRTCProps) => {
     const newPeer = new SimplePeer({
       initiator,
       trickle: false,
-      stream
+      stream,
+      config: {
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' },
+          { urls: 'stun:stun2.l.google.com:19302' }
+        ]
+      }
     });
 
     newPeer.on('signal', (data) => {
-      console.log('Sending signal:', data);
+      console.log('Sending WebRTC signal:', data.type);
       channelRef.current?.send({
         type: 'broadcast',
         event: 'webrtc_signal',
         payload: {
           signal: data,
-          from: user?.id
+          from: user?.id,
+          timestamp: Date.now()
         }
       });
     });
 
     newPeer.on('stream', (remoteStream) => {
-      console.log('Received remote stream');
+      console.log('Received remote stream with tracks:', remoteStream.getTracks().length);
       setRemoteStream(remoteStream);
       if (remoteVideoRef.current) {
         remoteVideoRef.current.srcObject = remoteStream;
@@ -72,10 +101,10 @@ export const useWebRTC = ({ roomId, enabled }: WebRTCProps) => {
     });
 
     newPeer.on('connect', () => {
-      console.log('WebRTC connection established');
+      console.log('WebRTC peer connection established');
       setIsConnected(true);
       toast({
-        title: "Video Call Connected",
+        title: "Video Call Connected! 💕",
         description: "You're now connected for video chat!"
       });
     });
@@ -87,16 +116,25 @@ export const useWebRTC = ({ roomId, enabled }: WebRTCProps) => {
     });
 
     newPeer.on('error', (error) => {
-      console.error('WebRTC error:', error);
+      console.error('WebRTC peer error:', error);
+      
+      // Try to reconnect automatically
+      setTimeout(() => {
+        if (!isConnected) {
+          console.log('Attempting to reconnect...');
+          startCall();
+        }
+      }, 3000);
+      
       toast({
-        title: "Connection Error",
-        description: "Video call connection failed",
+        title: "Connection Issue",
+        description: "Trying to reconnect automatically...",
         variant: "destructive"
       });
     });
 
     return newPeer;
-  }, [user?.id]);
+  }, [user?.id, isConnected]);
 
   const startCall = useCallback(async () => {
     if (!enabled || !user) return;
