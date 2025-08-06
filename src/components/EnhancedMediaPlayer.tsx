@@ -1,34 +1,31 @@
+
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import Plyr from 'plyr';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { useRealtimeSync } from '@/hooks/useRealtimeSync';
 import { useSmartSync } from '@/hooks/useSmartSync';
 import { useRoomPresence } from '@/hooks/useRoomPresence';
-import { MediaSourceSelector } from './MediaSourceSelector';
 import { FileUploadHandler } from './FileUploadHandler';
 import { 
   Play, 
-  Pause, 
-  Volume2, 
-  VolumeX, 
-  Maximize, 
   Users, 
   Wifi,
   WifiOff,
   Heart,
-  RotateCcw
+  RotateCcw,
+  Upload
 } from 'lucide-react';
 import 'plyr/dist/plyr.css';
 
 interface MediaSource {
-  type: 'local' | 'url' | 'ott';
-  url?: string;
+  type: 'local' | 'url' | 'shared';
+  url: string;
   file?: File;
-  title?: string;
+  fileId?: string;
+  title: string;
 }
 
 interface EnhancedMediaPlayerProps {
@@ -139,7 +136,6 @@ export const EnhancedMediaPlayer: React.FC<EnhancedMediaPlayerProps> = ({
   const initializePlayer = useCallback(() => {
     if (!videoRef.current || !mediaSource?.url) return;
 
-    // Destroy existing player
     if (playerRef.current) {
       playerRef.current.destroy();
     }
@@ -213,7 +209,6 @@ export const EnhancedMediaPlayer: React.FC<EnhancedMediaPlayerProps> = ({
       updateStatus('watching');
     });
 
-    // Periodic sync every 5 seconds
     const syncInterval = setInterval(() => {
       if (player && !player.paused) {
         sendPlaybackUpdate(player.currentTime, true);
@@ -237,10 +232,47 @@ export const EnhancedMediaPlayer: React.FC<EnhancedMediaPlayerProps> = ({
     }
   }, [initializePlayer]);
 
-  const handleMediaSelect = (source: MediaSource) => {
-    setMediaSource(source);
+  const handleFileSelect = (file: File, url: string) => {
+    setMediaSource({
+      type: 'local',
+      url,
+      file,
+      title: file.name
+    });
     setShowSourceSelector(false);
     resetMetrics();
+  };
+
+  const handleUrlSubmit = (url: string) => {
+    setMediaSource({
+      type: 'url',
+      url,
+      title: extractTitleFromUrl(url)
+    });
+    setShowSourceSelector(false);
+    resetMetrics();
+  };
+
+  const handleSharedFileSelect = (fileId: string, url: string, fileName: string) => {
+    setMediaSource({
+      type: 'shared',
+      url,
+      fileId,
+      title: fileName
+    });
+    setShowSourceSelector(false);
+    resetMetrics();
+  };
+
+  const extractTitleFromUrl = (url: string): string => {
+    try {
+      const urlObj = new URL(url);
+      const pathname = urlObj.pathname;
+      const filename = pathname.split('/').pop() || 'Video';
+      return filename.replace(/\.[^/.]+$/, '');
+    } catch {
+      return 'Video';
+    }
   };
 
   const resetPlayer = () => {
@@ -258,7 +290,12 @@ export const EnhancedMediaPlayer: React.FC<EnhancedMediaPlayerProps> = ({
   if (showSourceSelector) {
     return (
       <div className="space-y-6">
-        <MediaSourceSelector onMediaSelect={handleMediaSelect} roomId={roomId} />
+        <FileUploadHandler
+          roomId={roomId}
+          onFileSelect={handleFileSelect}
+          onUrlSubmit={handleUrlSubmit}
+          onSharedFileSelect={handleSharedFileSelect}
+        />
       </div>
     );
   }
@@ -306,12 +343,11 @@ export const EnhancedMediaPlayer: React.FC<EnhancedMediaPlayerProps> = ({
               </Button>
               
               <Button variant="ghost" size="sm" onClick={resetPlayer}>
-                <RotateCcw className="w-4 h-4" />
+                <Upload className="w-4 h-4" />
               </Button>
             </div>
           </div>
           
-          {/* Sync Metrics */}
           {metrics.latency > 0 && (
             <div className="mt-3 grid grid-cols-4 gap-4 text-xs text-muted-foreground">
               <div>Latency: {metrics.latency}ms</div>
@@ -340,7 +376,6 @@ export const EnhancedMediaPlayer: React.FC<EnhancedMediaPlayerProps> = ({
                 playsInline
               />
               
-              {/* Heart Animation Overlay */}
               <AnimatePresence>
                 {heartAnimation && (
                   <motion.div
@@ -354,7 +389,6 @@ export const EnhancedMediaPlayer: React.FC<EnhancedMediaPlayerProps> = ({
                 )}
               </AnimatePresence>
               
-              {/* Loading Overlay */}
               {!isPlayerReady && (
                 <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
                   <div className="text-center text-white">
@@ -365,19 +399,20 @@ export const EnhancedMediaPlayer: React.FC<EnhancedMediaPlayerProps> = ({
               )}
             </div>
             
-            {/* Media Info */}
             {mediaSource && (
               <div className="p-4 bg-muted/30">
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="font-medium">{mediaSource.title}</h3>
                     <p className="text-sm text-muted-foreground capitalize">
-                      {mediaSource.type} source
+                      {mediaSource.type === 'shared' ? 'Shared file - synced automatically' : 
+                       mediaSource.type === 'local' ? 'Local file - upload to share with partner' :
+                       'URL source - synced automatically'}
                     </p>
                   </div>
                   {partnerJoined && (
                     <Badge variant="default" className="bg-green-500">
-                      Partner joined!
+                      Partner joined! 💕
                     </Badge>
                   )}
                 </div>

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
-import { toast } from '@/components/ui/use-toast';
+import { toast } from '@/hooks/use-toast';
 
 export interface Room {
   id: string;
@@ -62,7 +62,6 @@ export const useRoom = (roomId?: string) => {
 
       console.log('Room created successfully:', data);
 
-      // Create initial playback state
       const { error: playbackError } = await supabase
         .from('playback_state')
         .insert({
@@ -120,25 +119,31 @@ export const useRoom = (roomId?: string) => {
     try {
       console.log('Looking for room with code:', trimmedCode);
       
-      // Find room by code
+      // Search for room by code with better error handling
       const { data: roomData, error: roomError } = await supabase
         .from('rooms')
         .select('*')
         .eq('room_code', trimmedCode)
-        .maybeSingle();
+        .single();
 
-      if (roomError) {
+      if (roomError || !roomData) {
         console.error('Room search error:', roomError);
-        throw roomError;
-      }
+        
+        // Try case-insensitive search as fallback
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from('rooms')
+          .select('*')
+          .ilike('room_code', trimmedCode);
 
-      if (!roomData) {
-        throw new Error('Room not found with that code');
+        if (fallbackError || !fallbackData || fallbackData.length === 0) {
+          throw new Error(`Room not found with code "${trimmedCode}". Please check the code and try again.`);
+        }
+        
+        roomData = fallbackData[0];
       }
 
       console.log('Found room:', roomData);
 
-      // Check if user is already the creator
       if (roomData.creator_id === user.id) {
         setRoom(roomData);
         toast({
@@ -148,12 +153,10 @@ export const useRoom = (roomId?: string) => {
         return roomData;
       }
 
-      // Check if room already has a partner
       if (roomData.partner_id && roomData.partner_id !== user.id) {
         throw new Error('This room is already full');
       }
 
-      // Update room with partner if not already set
       if (!roomData.partner_id) {
         const { data: updatedRoom, error: updateError } = await supabase
           .from('rooms')
@@ -175,7 +178,6 @@ export const useRoom = (roomId?: string) => {
         
         return updatedRoom;
       } else {
-        // User is already the partner
         setRoom(roomData);
         toast({
           title: "Welcome Back! 💕",
@@ -186,8 +188,8 @@ export const useRoom = (roomId?: string) => {
     } catch (error: any) {
       console.error('Join room failed:', error);
       toast({
-        title: "Error",
-        description: error.message || "Failed to join room",
+        title: "Room Not Found",
+        description: error.message || `Could not find room with code "${trimmedCode}"`,
         variant: "destructive"
       });
       return null;
@@ -220,41 +222,56 @@ export const useRoom = (roomId?: string) => {
     
     setLoading(true);
     try {
-      let query = supabase.from('rooms').select('*');
+      let roomData = null;
       
-      // Check if identifier is a UUID (room ID) or room code
       const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(identifier);
       
       if (isUUID) {
-        query = query.eq('id', identifier);
+        const { data, error } = await supabase
+          .from('rooms')
+          .select('*')
+          .eq('id', identifier)
+          .single();
+          
+        if (error && error.code !== 'PGRST116') throw error;
+        roomData = data;
       } else {
-        // Treat as room code
-        query = query.eq('room_code', identifier.toUpperCase());
+        // Try exact match first
+        const { data, error } = await supabase
+          .from('rooms')
+          .select('*')
+          .eq('room_code', identifier.toUpperCase())
+          .single();
+          
+        if (error && error.code !== 'PGRST116') {
+          // Try case-insensitive search
+          const { data: fallbackData, error: fallbackError } = await supabase
+            .from('rooms')
+            .select('*')
+            .ilike('room_code', identifier);
+            
+          if (fallbackError) throw fallbackError;
+          roomData = fallbackData?.[0] || null;
+        } else {
+          roomData = data;
+        }
       }
-      
-      const { data, error } = await query.maybeSingle();
 
-      if (error) {
-        console.error('Error fetching room:', error);
-        throw error;
-      }
-
-      if (!data) {
+      if (!roomData) {
         console.log('Room not found:', identifier);
         setRoom(null);
         return null;
       }
 
-      // Check if user has access to this room
-      if (data.creator_id !== user.id && data.partner_id !== user.id) {
-        console.log('User does not have access to room:', data.id);
+      if (roomData.creator_id !== user.id && roomData.partner_id !== user.id) {
+        console.log('User does not have access to room:', roomData.id);
         setRoom(null);
         return null;
       }
 
-      console.log('Room fetched successfully:', data);
-      setRoom(data);
-      return data;
+      console.log('Room fetched successfully:', roomData);
+      setRoom(roomData);
+      return roomData;
     } catch (error: any) {
       console.error('fetchRoom error:', error);
       setRoom(null);

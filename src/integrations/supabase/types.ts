@@ -280,6 +280,45 @@ export type Database = {
         }
         Relationships: []
       }
+      shared_files: {
+        Row: {
+          created_at: string
+          file_name: string
+          file_size: number
+          id: string
+          mime_type: string
+          room_id: string
+          storage_path: string
+          updated_at: string
+          upload_status: string | null
+          uploader_id: string
+        }
+        Insert: {
+          created_at?: string
+          file_name: string
+          file_size: number
+          id?: string
+          mime_type: string
+          room_id: string
+          storage_path: string
+          updated_at?: string
+          upload_status?: string | null
+          uploader_id: string
+        }
+        Update: {
+          created_at?: string
+          file_name?: string
+          file_size?: number
+          id?: string
+          mime_type?: string
+          room_id?: string
+          storage_path?: string
+          updated_at?: string
+          upload_status?: string | null
+          uploader_id?: string
+        }
+        Relationships: []
+      }
       users: {
         Row: {
           avatar_url: string | null
