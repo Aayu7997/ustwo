@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
@@ -7,8 +8,9 @@ export interface Note {
   id: string;
   content: string;
   sender_id: string;
-  receiver_id: string;
+  receiver_id: string | null;
   is_read: boolean;
+  is_personal: boolean;
   created_at: string;
 }
 
@@ -75,7 +77,7 @@ export const useNotes = (partnerId?: string) => {
     }
   };
 
-  const sendNote = async (content: string, receiverId: string) => {
+  const sendNote = async (content: string, receiverId?: string, isPersonal: boolean = false) => {
     if (!user) {
       toast({
         title: "Error",
@@ -94,26 +96,34 @@ export const useNotes = (partnerId?: string) => {
       return null;
     }
 
-    if (!receiverId) {
-      toast({
-        title: "Error",
-        description: "No partner found to send note to",
-        variant: "destructive"
-      });
-      return null;
+    // For personal notes, receiverId can be null
+    if (!isPersonal && !receiverId) {
+      const effectivePartnerId = getEffectivePartnerId();
+      if (!effectivePartnerId) {
+        toast({
+          title: "Error",
+          description: "No partner found to send note to",
+          variant: "destructive"
+        });
+        return null;
+      }
+      receiverId = effectivePartnerId;
     }
 
     try {
-      console.log('Sending note from', user.id, 'to', receiverId, 'content:', content.trim());
+      console.log('Sending note from', user.id, 'to', receiverId, 'content:', content.trim(), 'personal:', isPersonal);
       
+      const noteData = {
+        content: content.trim(),
+        sender_id: user.id,
+        receiver_id: isPersonal ? null : receiverId,
+        is_read: false,
+        is_personal: isPersonal
+      };
+
       const { data, error } = await supabase
         .from('notes')
-        .insert({
-          content: content.trim(),
-          sender_id: user.id,
-          receiver_id: receiverId,
-          is_read: false
-        })
+        .insert(noteData)
         .select()
         .single();
 
@@ -125,10 +135,18 @@ export const useNotes = (partnerId?: string) => {
       console.log('Note sent successfully:', data);
       
       setNotes(prev => [data, ...prev]);
-      toast({
-        title: "Note Sent! 💕",
-        description: "Your love note has been delivered"
-      });
+      
+      if (isPersonal) {
+        toast({
+          title: "Personal Note Saved! 📝",
+          description: "Your private note has been saved"
+        });
+      } else {
+        toast({
+          title: "Note Sent! 💕",
+          description: "Your love note has been delivered"
+        });
+      }
 
       return data;
     } catch (error: any) {
@@ -140,6 +158,10 @@ export const useNotes = (partnerId?: string) => {
       });
       return null;
     }
+  };
+
+  const sendPersonalNote = async (content: string) => {
+    return await sendNote(content, undefined, true);
   };
 
   const markAsRead = async (noteId: string) => {
@@ -164,6 +186,14 @@ export const useNotes = (partnerId?: string) => {
     return notes.filter(note => 
       note.receiver_id === user?.id && !note.is_read
     ).length;
+  };
+
+  const getPersonalNotes = () => {
+    return notes.filter(note => note.is_personal && note.sender_id === user?.id);
+  };
+
+  const getPartnerNotes = () => {
+    return notes.filter(note => !note.is_personal && (note.sender_id === user?.id || note.receiver_id === user?.id));
   };
 
   useEffect(() => {
@@ -202,8 +232,11 @@ export const useNotes = (partnerId?: string) => {
     notes,
     loading,
     sendNote,
+    sendPersonalNote,
     markAsRead,
     unreadCount: getUnreadCount(),
+    personalNotes: getPersonalNotes(),
+    partnerNotes: getPartnerNotes(),
     refetch: fetchNotes,
     partnerId: getEffectivePartnerId()
   };

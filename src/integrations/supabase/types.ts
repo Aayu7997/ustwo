@@ -61,6 +61,36 @@ export type Database = {
           },
         ]
       }
+      google_drive_tokens: {
+        Row: {
+          access_token: string
+          created_at: string
+          expires_at: string
+          id: string
+          refresh_token: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          created_at?: string
+          expires_at: string
+          id?: string
+          refresh_token?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          refresh_token?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       invites: {
         Row: {
           created_at: string
@@ -174,24 +204,27 @@ export type Database = {
           content: string
           created_at: string
           id: string
+          is_personal: boolean | null
           is_read: boolean | null
-          receiver_id: string
+          receiver_id: string | null
           sender_id: string
         }
         Insert: {
           content: string
           created_at?: string
           id?: string
+          is_personal?: boolean | null
           is_read?: boolean | null
-          receiver_id: string
+          receiver_id?: string | null
           sender_id: string
         }
         Update: {
           content?: string
           created_at?: string
           id?: string
+          is_personal?: boolean | null
           is_read?: boolean | null
-          receiver_id?: string
+          receiver_id?: string | null
           sender_id?: string
         }
         Relationships: []
@@ -285,7 +318,10 @@ export type Database = {
           created_at: string
           file_name: string
           file_size: number
+          google_drive_id: string | null
+          google_drive_url: string | null
           id: string
+          is_google_drive: boolean | null
           mime_type: string
           room_id: string
           storage_path: string
@@ -297,7 +333,10 @@ export type Database = {
           created_at?: string
           file_name: string
           file_size: number
+          google_drive_id?: string | null
+          google_drive_url?: string | null
           id?: string
+          is_google_drive?: boolean | null
           mime_type: string
           room_id: string
           storage_path: string
@@ -309,7 +348,10 @@ export type Database = {
           created_at?: string
           file_name?: string
           file_size?: number
+          google_drive_id?: string | null
+          google_drive_url?: string | null
           id?: string
+          is_google_drive?: boolean | null
           mime_type?: string
           room_id?: string
           storage_path?: string
