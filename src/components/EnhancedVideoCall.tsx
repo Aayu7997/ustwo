@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -28,7 +29,6 @@ export const EnhancedVideoCall: React.FC<EnhancedVideoCallProps> = ({ roomId }) 
   const [enabled, setEnabled] = useState(false);
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [videoEnabled, setVideoEnabled] = useState(true);
-  const [isPiP, setIsPiP] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [volume, setVolume] = useState(50);
 
@@ -48,10 +48,6 @@ export const EnhancedVideoCall: React.FC<EnhancedVideoCallProps> = ({ roomId }) 
       try {
         setEnabled(true);
         await startCall();
-        toast({
-          title: "Video Call Started",
-          description: "Waiting for your partner to join...",
-        });
       } catch (error) {
         setEnabled(false);
         console.error('Failed to start call:', error);
@@ -59,12 +55,7 @@ export const EnhancedVideoCall: React.FC<EnhancedVideoCallProps> = ({ roomId }) 
     } else {
       endCall();
       setEnabled(false);
-      setIsPiP(false);
       setIsMinimized(false);
-      toast({
-        title: "Video Call Ended",
-        description: "Call has been disconnected",
-      });
     }
   };
 
@@ -95,29 +86,6 @@ export const EnhancedVideoCall: React.FC<EnhancedVideoCallProps> = ({ roomId }) 
         title: videoEnabled ? "Camera Off" : "Camera On",
         description: videoEnabled ? "Your camera is now off" : "Your camera is now on",
       });
-    }
-  };
-
-  const togglePiP = async () => {
-    if (remoteVideoRef.current && 'requestPictureInPicture' in remoteVideoRef.current) {
-      try {
-        if (!isPiP) {
-          await remoteVideoRef.current.requestPictureInPicture();
-          setIsPiP(true);
-        } else {
-          if (document.pictureInPictureElement) {
-            await document.exitPictureInPicture();
-          }
-          setIsPiP(false);
-        }
-      } catch (error) {
-        console.error('PiP error:', error);
-        toast({
-          title: "Picture-in-Picture Error",
-          description: "Could not toggle Picture-in-Picture mode",
-          variant: "destructive"
-        });
-      }
     }
   };
 
@@ -168,7 +136,7 @@ export const EnhancedVideoCall: React.FC<EnhancedVideoCallProps> = ({ roomId }) 
               <Video className="w-5 h-5" />
               <CardTitle className="text-lg">Video Call</CardTitle>
               <Badge variant={isConnected ? "default" : "secondary"}>
-                {isConnected ? "Connected" : "Connecting..."}
+                {isConnected ? "Connected" : stream ? "Connecting..." : "Starting..."}
               </Badge>
             </div>
             <div className="flex items-center gap-1">
@@ -178,14 +146,6 @@ export const EnhancedVideoCall: React.FC<EnhancedVideoCallProps> = ({ roomId }) 
                 onClick={toggleMinimize}
               >
                 {isMinimized ? <Maximize className="w-4 h-4" /> : <Minimize className="w-4 h-4" />}
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={togglePiP}
-                disabled={!remoteStream}
-              >
-                <PictureInPicture className="w-4 h-4" />
               </Button>
             </div>
           </div>
@@ -226,26 +186,11 @@ export const EnhancedVideoCall: React.FC<EnhancedVideoCallProps> = ({ roomId }) 
                       autoPlay
                       playsInline
                       className="w-full h-full object-cover"
-                      style={{ transform: 'scaleX(-1)' }}
                     />
                     <div className="absolute bottom-2 left-2">
                       <Badge variant="outline" className="bg-black/50 text-white border-white/20">
                         Partner
                       </Badge>
-                    </div>
-                    <div className="absolute bottom-2 right-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          if (remoteVideoRef.current) {
-                            remoteVideoRef.current.volume = volume / 100;
-                          }
-                        }}
-                        className="text-white hover:bg-white/20"
-                      >
-                        {volume > 0 ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-                      </Button>
                     </div>
                   </>
                 ) : (
@@ -253,6 +198,7 @@ export const EnhancedVideoCall: React.FC<EnhancedVideoCallProps> = ({ roomId }) 
                     <div className="text-center">
                       <Video className="w-12 h-12 mx-auto mb-2 opacity-50" />
                       <p className="text-sm">Waiting for partner...</p>
+                      {stream && <p className="text-xs mt-1">Your camera is ready</p>}
                     </div>
                   </div>
                 )}
@@ -266,6 +212,7 @@ export const EnhancedVideoCall: React.FC<EnhancedVideoCallProps> = ({ roomId }) 
               variant={audioEnabled ? "default" : "destructive"}
               size="sm"
               onClick={toggleAudio}
+              disabled={!stream}
             >
               {audioEnabled ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
             </Button>
@@ -274,6 +221,7 @@ export const EnhancedVideoCall: React.FC<EnhancedVideoCallProps> = ({ roomId }) 
               variant={videoEnabled ? "default" : "destructive"}
               size="sm"
               onClick={toggleVideo}
+              disabled={!stream}
             >
               {videoEnabled ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
             </Button>
@@ -285,21 +233,6 @@ export const EnhancedVideoCall: React.FC<EnhancedVideoCallProps> = ({ roomId }) 
             >
               <PhoneOff className="w-4 h-4" />
             </Button>
-
-            {!isMinimized && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  toast({
-                    title: "Settings",
-                    description: "Video call settings coming soon!",
-                  });
-                }}
-              >
-                <Settings className="w-4 h-4" />
-              </Button>
-            )}
           </div>
 
           {/* Connection Status */}
@@ -307,18 +240,18 @@ export const EnhancedVideoCall: React.FC<EnhancedVideoCallProps> = ({ roomId }) 
             <div className="px-4 pb-4">
               <div className="text-xs text-muted-foreground space-y-1">
                 <div className="flex justify-between">
-                  <span>Connection:</span>
-                  <span className={isConnected ? "text-green-600" : "text-yellow-600"}>
-                    {isConnected ? "Stable" : "Establishing..."}
+                  <span>Status:</span>
+                  <span className={isConnected ? "text-green-600" : stream ? "text-yellow-600" : "text-blue-600"}>
+                    {isConnected ? "Connected" : stream ? "Waiting for partner" : "Starting..."}
                   </span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Video Quality:</span>
-                  <span>720p</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Audio:</span>
                   <span>{audioEnabled ? "Active" : "Muted"}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Video:</span>
+                  <span>{videoEnabled ? "Active" : "Off"}</span>
                 </div>
               </div>
             </div>

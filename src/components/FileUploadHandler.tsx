@@ -48,10 +48,10 @@ export const FileUploadHandler: React.FC<FileUploadHandlerProps> = ({
   } = useGoogleDrive();
 
   const validateFile = (file: File): boolean => {
-    if (!file.type.startsWith('video/')) {
+    if (!file.type.startsWith('video/') && !file.type.startsWith('audio/')) {
       toast({
         title: "Invalid file type",
-        description: "Please select a video file (MP4, WebM, AVI, MOV)",
+        description: "Please select a video or audio file (MP4, WebM, AVI, MOV, MP3, WAV)",
         variant: "destructive"
       });
       return false;
@@ -76,15 +76,19 @@ export const FileUploadHandler: React.FC<FileUploadHandlerProps> = ({
     setSelectedFile(file);
     
     // Create local URL for immediate playback
+    if (localFileUrl) {
+      URL.revokeObjectURL(localFileUrl);
+    }
+    
     const localUrl = URL.createObjectURL(file);
     setLocalFileUrl(localUrl);
     onFileSelect(file, localUrl);
 
     toast({
-      title: "File ready for local playback! 🎬",
-      description: `${file.name} is ready to play. Upload to share with your partner.`,
+      title: "File ready! 🎬",
+      description: `${file.name} is loaded and ready to play locally. Upload to share with your partner.`,
     });
-  }, [onFileSelect, maxFileSize]);
+  }, [onFileSelect, maxFileSize, localFileUrl]);
 
   const handleUploadToCloud = async () => {
     if (!selectedFile) return;
@@ -94,6 +98,10 @@ export const FileUploadHandler: React.FC<FileUploadHandlerProps> = ({
       const streamingUrl = await getStreamingUrl(uploadedFile.storage_path);
       if (streamingUrl) {
         onSharedFileSelect(uploadedFile.id, streamingUrl, uploadedFile.file_name);
+        toast({
+          title: "File shared! 💕",
+          description: `${uploadedFile.file_name} is now available for your partner`
+        });
       }
     }
   };
@@ -115,30 +123,21 @@ export const FileUploadHandler: React.FC<FileUploadHandlerProps> = ({
     }
   };
 
-  const handleGoogleDriveFileSelect = async (driveFile: any) => {
-    // Use Google Drive streaming URL directly
-    const streamingUrl = driveFile.webContentLink || driveFile.webViewLink;
-    onSharedFileSelect(driveFile.id, streamingUrl, driveFile.name);
-    
-    toast({
-      title: "Google Drive file loaded! 💕",
-      description: `Now watching ${driveFile.name} from Google Drive`,
-    });
-  };
-
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setDragOver(false);
 
     const files = Array.from(e.dataTransfer.files);
-    const videoFile = files.find(file => file.type.startsWith('video/'));
+    const mediaFile = files.find(file => 
+      file.type.startsWith('video/') || file.type.startsWith('audio/')
+    );
 
-    if (videoFile) {
-      handleFileSelect(videoFile);
+    if (mediaFile) {
+      handleFileSelect(mediaFile);
     } else {
       toast({
-        title: "No video file found",
-        description: "Please drop a video file",
+        title: "No media file found",
+        description: "Please drop a video or audio file",
         variant: "destructive"
       });
     }
@@ -146,7 +145,10 @@ export const FileUploadHandler: React.FC<FileUploadHandlerProps> = ({
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) handleFileSelect(file);
+    if (file) {
+      console.log('File selected:', file.name, file.type, file.size);
+      handleFileSelect(file);
+    }
   };
 
   const handleUrlSubmit = () => {
@@ -154,7 +156,7 @@ export const FileUploadHandler: React.FC<FileUploadHandlerProps> = ({
     if (!url) {
       toast({
         title: "URL required",
-        description: "Please enter a valid video URL",
+        description: "Please enter a valid media URL",
         variant: "destructive"
       });
       return;
@@ -166,7 +168,7 @@ export const FileUploadHandler: React.FC<FileUploadHandlerProps> = ({
       setUrlInput('');
       toast({
         title: "URL loaded",
-        description: "Video URL is ready for playback",
+        description: "Media URL is ready for playback",
       });
     } catch {
       toast({
@@ -179,16 +181,9 @@ export const FileUploadHandler: React.FC<FileUploadHandlerProps> = ({
 
   const clearSelection = () => {
     setSelectedFile(null);
-    setLocalFileUrl(null);
     if (localFileUrl) {
       URL.revokeObjectURL(localFileUrl);
-    }
-  };
-
-  const handleConnectGoogleDrive = async () => {
-    await connectGoogleDrive();
-    if (driveConnected) {
-      fetchDriveFiles();
+      setLocalFileUrl(null);
     }
   };
 
@@ -211,75 +206,26 @@ export const FileUploadHandler: React.FC<FileUploadHandlerProps> = ({
               Google Drive Integration
             </Label>
             
-            {!driveConnected ? (
-              <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center">
-                <div className="space-y-3">
-                  <svg className="w-12 h-12 mx-auto text-muted-foreground" viewBox="0 0 24 24">
-                    <path fill="currentColor" d="M6 2c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 2 2h8c1.1 0 2-.9 2-2V8l-6-6H6zm7 7V3.5L18.5 9H13z"/>
-                  </svg>
-                  <h3 className="font-semibold">Connect Google Drive</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Access your Google Drive videos to watch together
-                  </p>
-                  <Button 
-                    onClick={handleConnectGoogleDrive}
-                    disabled={driveLoading}
-                    className="flex items-center gap-2"
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                    {driveLoading ? 'Connecting...' : 'Connect Google Drive'}
-                  </Button>
-                </div>
-              </div>
-            ) : (
+            <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center">
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-green-600 font-medium">
-                    ✓ Google Drive Connected
-                  </span>
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
-                    onClick={fetchDriveFiles}
-                    disabled={driveLoading}
-                  >
-                    {driveLoading ? 'Loading...' : 'Refresh Files'}
-                  </Button>
-                </div>
-
-                {driveFiles.length > 0 && (
-                  <div className="space-y-2 max-h-40 overflow-y-auto">
-                    {driveFiles.map((file) => (
-                      <motion.div
-                        key={file.id}
-                        initial={{ opacity: 0, y: 5 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="bg-muted/30 rounded-lg p-3 flex items-center justify-between"
-                      >
-                        <div className="flex items-center gap-3">
-                          <FileVideo className="w-4 h-4 text-primary" />
-                          <div>
-                            <p className="font-medium text-sm">{file.name}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {file.size ? `${(parseInt(file.size) / (1024 * 1024)).toFixed(2)} MB` : 'Unknown size'} • Google Drive
-                            </p>
-                          </div>
-                        </div>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleGoogleDriveFileSelect(file)}
-                          className="flex items-center gap-1"
-                        >
-                          <Play className="w-3 h-3" />
-                          Watch
-                        </Button>
-                      </motion.div>
-                    ))}
-                  </div>
-                )}
+                <svg className="w-12 h-12 mx-auto text-muted-foreground" viewBox="0 0 24 24">
+                  <path fill="currentColor" d="M6 2c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 2 2h8c1.1 0 2-.9 2-2V8l-6-6H6zm7 7V3.5L18.5 9H13z"/>
+                </svg>
+                <h3 className="font-semibold">Google Drive Integration</h3>
+                <p className="text-sm text-muted-foreground">
+                  Google Drive requires OAuth configuration in Supabase
+                </p>
+                <Button 
+                  onClick={connectGoogleDrive}
+                  disabled={driveLoading}
+                  className="flex items-center gap-2"
+                  variant="outline"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  {driveLoading ? 'Checking...' : 'Test Google Drive'}
+                </Button>
               </div>
-            )}
+            </div>
           </div>
 
           {/* File Upload Area */}
@@ -300,10 +246,10 @@ export const FileUploadHandler: React.FC<FileUploadHandlerProps> = ({
             >
               <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
               <h3 className="text-lg font-semibold mb-2">
-                Drop your video file here
+                Drop your media file here
               </h3>
               <p className="text-muted-foreground mb-4">
-                Play instantly locally, then share with your partner
+                Supports video and audio files - plays instantly!
               </p>
               <Label htmlFor="file-input">
                 <Button variant="outline" className="cursor-pointer" disabled={uploading}>
@@ -313,7 +259,7 @@ export const FileUploadHandler: React.FC<FileUploadHandlerProps> = ({
               <Input
                 id="file-input"
                 type="file"
-                accept="video/*"
+                accept="video/*,audio/*"
                 className="hidden"
                 onChange={handleFileInput}
                 disabled={uploading}
@@ -328,7 +274,7 @@ export const FileUploadHandler: React.FC<FileUploadHandlerProps> = ({
                 className="space-y-2"
               >
                 <div className="flex justify-between text-sm">
-                  <span>Uploading to cloud...</span>
+                  <span>Uploading to share with partner...</span>
                   <span>{uploadProgress}%</span>
                 </div>
                 <Progress value={uploadProgress} className="w-full" />
@@ -348,7 +294,7 @@ export const FileUploadHandler: React.FC<FileUploadHandlerProps> = ({
                     <div>
                       <p className="font-medium">{selectedFile.name}</p>
                       <p className="text-sm text-muted-foreground">
-                        {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB • Ready to play locally
+                        {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB • Ready to play
                       </p>
                     </div>
                   </div>
@@ -360,7 +306,7 @@ export const FileUploadHandler: React.FC<FileUploadHandlerProps> = ({
                       className="flex items-center gap-1"
                     >
                       <Share className="w-4 h-4" />
-                      Share with Partner
+                      Share
                     </Button>
                     <Button size="sm" variant="ghost" onClick={clearSelection}>
                       <X className="w-4 h-4" />
@@ -391,7 +337,7 @@ export const FileUploadHandler: React.FC<FileUploadHandlerProps> = ({
                       <div>
                         <p className="font-medium text-sm">{file.file_name}</p>
                         <p className="text-xs text-muted-foreground">
-                          {(file.file_size / (1024 * 1024)).toFixed(2)} MB • Shared by partner
+                          {(file.file_size / (1024 * 1024)).toFixed(2)} MB • Shared
                         </p>
                       </div>
                     </div>
@@ -402,7 +348,7 @@ export const FileUploadHandler: React.FC<FileUploadHandlerProps> = ({
                       className="flex items-center gap-1"
                     >
                       <Play className="w-3 h-3" />
-                      Watch Together
+                      Play
                     </Button>
                   </motion.div>
                 ))}
@@ -412,7 +358,7 @@ export const FileUploadHandler: React.FC<FileUploadHandlerProps> = ({
 
           {/* URL Input */}
           <div className="space-y-4">
-            <Label className="text-sm font-medium">Video URL</Label>
+            <Label className="text-sm font-medium">Media URL</Label>
             <div className="flex gap-2">
               <Input
                 placeholder="https://example.com/video.mp4"
@@ -421,12 +367,12 @@ export const FileUploadHandler: React.FC<FileUploadHandlerProps> = ({
                 onKeyPress={(e) => e.key === 'Enter' && handleUrlSubmit()}
               />
               <Button onClick={handleUrlSubmit} disabled={!urlInput.trim()}>
-                Load URL
+                Load
               </Button>
             </div>
             <div className="text-xs text-muted-foreground space-y-1">
-              <p>• Direct video links automatically sync between partners</p>
-              <p>• YouTube, Vimeo, and streaming URLs supported</p>
+              <p>• YouTube, Vimeo, direct links supported</p>
+              <p>• All URLs sync automatically between partners</p>
             </div>
           </div>
         </CardContent>
