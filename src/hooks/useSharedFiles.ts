@@ -37,7 +37,12 @@ export const useSharedFiles = (roomId: string) => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setSharedFiles(data || []);
+      // Type cast to ensure proper type matching
+      const typedFiles: SharedFile[] = (data || []).map(file => ({
+        ...file,
+        upload_status: file.upload_status as 'uploading' | 'completed' | 'failed'
+      }));
+      setSharedFiles(typedFiles);
     } catch (error) {
       console.error('Error fetching shared files:', error);
     }
@@ -72,15 +77,19 @@ export const useSharedFiles = (roomId: string) => {
 
       if (dbError) throw dbError;
 
-      // Upload to storage
+      // Upload to storage - simulate progress for now
+      let progress = 0;
+      const progressInterval = setInterval(() => {
+        progress += 10;
+        setUploadProgress(Math.min(progress, 90));
+      }, 200);
+
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('shared-media')
-        .upload(filePath, file, {
-          onUploadProgress: (progress) => {
-            const percentage = Math.round((progress.loaded / progress.total) * 100);
-            setUploadProgress(percentage);
-          }
-        });
+        .upload(filePath, file);
+
+      clearInterval(progressInterval);
+      setUploadProgress(100);
 
       if (uploadError) {
         // Update status to failed
@@ -101,13 +110,19 @@ export const useSharedFiles = (roomId: string) => {
 
       if (updateError) throw updateError;
 
-      setCurrentFile(updatedFile);
+      // Type cast the updated file
+      const typedUpdatedFile: SharedFile = {
+        ...updatedFile,
+        upload_status: updatedFile.upload_status as 'uploading' | 'completed' | 'failed'
+      };
+
+      setCurrentFile(typedUpdatedFile);
       toast({
         title: "File uploaded successfully! 💕",
         description: `${file.name} is now available for your partner to stream`,
       });
 
-      return updatedFile;
+      return typedUpdatedFile;
 
     } catch (error: any) {
       console.error('Upload error:', error);
@@ -158,7 +173,10 @@ export const useSharedFiles = (roomId: string) => {
           console.log('File update:', payload);
           
           if (payload.eventType === 'INSERT' && payload.new.upload_status === 'completed') {
-            const newFile = payload.new as SharedFile;
+            const newFile: SharedFile = {
+              ...payload.new as any,
+              upload_status: payload.new.upload_status as 'uploading' | 'completed' | 'failed'
+            };
             setSharedFiles(prev => [newFile, ...prev]);
             
             // Notify if uploaded by partner
@@ -172,9 +190,15 @@ export const useSharedFiles = (roomId: string) => {
           
           if (payload.eventType === 'UPDATE') {
             setSharedFiles(prev => 
-              prev.map(file => 
-                file.id === payload.new.id ? payload.new as SharedFile : file
-              )
+              prev.map(file => {
+                if (file.id === payload.new.id) {
+                  return {
+                    ...payload.new as any,
+                    upload_status: payload.new.upload_status as 'uploading' | 'completed' | 'failed'
+                  };
+                }
+                return file;
+              })
             );
           }
         }

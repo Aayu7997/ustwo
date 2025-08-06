@@ -124,22 +124,76 @@ export const useRoom = (roomId?: string) => {
         .from('rooms')
         .select('*')
         .eq('room_code', trimmedCode)
-        .single();
+        .maybeSingle();
 
-      if (roomError || !roomData) {
+      if (roomError) {
         console.error('Room search error:', roomError);
-        
+        throw roomError;
+      }
+
+      if (!roomData) {
         // Try case-insensitive search as fallback
         const { data: fallbackData, error: fallbackError } = await supabase
           .from('rooms')
           .select('*')
-          .ilike('room_code', trimmedCode);
+          .ilike('room_code', trimmedCode)
+          .maybeSingle();
 
-        if (fallbackError || !fallbackData || fallbackData.length === 0) {
+        if (fallbackError) {
+          console.error('Fallback search error:', fallbackError);
+          throw fallbackError;
+        }
+
+        if (!fallbackData) {
           throw new Error(`Room not found with code "${trimmedCode}". Please check the code and try again.`);
         }
+
+        // Use fallback data
+        const foundRoom = fallbackData;
         
-        roomData = fallbackData[0];
+        console.log('Found room:', foundRoom);
+
+        if (foundRoom.creator_id === user.id) {
+          setRoom(foundRoom);
+          toast({
+            title: "Welcome Back! 💕",
+            description: `You're already the creator of "${foundRoom.name}"`
+          });
+          return foundRoom;
+        }
+
+        if (foundRoom.partner_id && foundRoom.partner_id !== user.id) {
+          throw new Error('This room is already full');
+        }
+
+        if (!foundRoom.partner_id) {
+          const { data: updatedRoom, error: updateError } = await supabase
+            .from('rooms')
+            .update({ partner_id: user.id })
+            .eq('id', foundRoom.id)
+            .select()
+            .single();
+
+          if (updateError) {
+            console.error('Room update error:', updateError);
+            throw updateError;
+          }
+
+          setRoom(updatedRoom);
+          toast({
+            title: "Joined Room! 💕",
+            description: `Welcome to "${updatedRoom.name}"`
+          });
+          
+          return updatedRoom;
+        } else {
+          setRoom(foundRoom);
+          toast({
+            title: "Welcome Back! 💕",
+            description: `You're already in "${foundRoom.name}"`
+          });
+          return foundRoom;
+        }
       }
 
       console.log('Found room:', roomData);
@@ -222,7 +276,7 @@ export const useRoom = (roomId?: string) => {
     
     setLoading(true);
     try {
-      let roomData = null;
+      let roomData: Room | null = null;
       
       const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(identifier);
       
