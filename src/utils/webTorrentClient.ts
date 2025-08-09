@@ -1,6 +1,13 @@
 
 import { toast } from '@/hooks/use-toast';
 
+const WEBTORRENT_TRACKERS = [
+  'wss://tracker.openwebtorrent.com',
+  'wss://tracker.btorrent.xyz',
+  'wss://tracker.fastcast.nz',
+  'wss://tracker.webtorrent.dev'
+];
+
 // WebTorrent client utility for P2P file sharing
 class WebTorrentClientWrapper {
   private client: any = null;
@@ -34,7 +41,7 @@ class WebTorrentClientWrapper {
       if (!client) return null;
 
       return new Promise((resolve, reject) => {
-        client.seed(file, (torrent: any) => {
+        client.seed(file, { announce: WEBTORRENT_TRACKERS }, (torrent: any) => {
           console.log('File seeded successfully:', torrent.infoHash);
           toast({
             title: "File shared via P2P! 🚀",
@@ -64,7 +71,7 @@ class WebTorrentClientWrapper {
       if (!client) return null;
 
       return new Promise((resolve, reject) => {
-        const torrent = client.add(magnetURI, { announce: [] });
+        const torrent = client.add(magnetURI, { announce: WEBTORRENT_TRACKERS });
 
         torrent.on('ready', () => {
           console.log('Torrent ready:', torrent.name);

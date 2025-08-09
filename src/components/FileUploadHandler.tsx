@@ -1,5 +1,5 @@
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -30,6 +30,7 @@ export const FileUploadHandler: React.FC<FileUploadHandlerProps> = ({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [urlInput, setUrlInput] = useState('');
   const [localFileUrl, setLocalFileUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { 
     sharedFiles, 
@@ -251,19 +252,23 @@ export const FileUploadHandler: React.FC<FileUploadHandlerProps> = ({
               <p className="text-muted-foreground mb-4">
                 Supports video and audio files - plays instantly!
               </p>
-              <Label htmlFor="file-input">
-                <Button variant="outline" className="cursor-pointer" disabled={uploading}>
+                <Button 
+                  variant="outline" 
+                  className="cursor-pointer" 
+                  disabled={uploading}
+                  onClick={() => fileInputRef.current?.click()}
+                >
                   Choose File
                 </Button>
-              </Label>
-              <Input
-                id="file-input"
-                type="file"
-                accept="video/*,audio/*"
-                className="hidden"
-                onChange={handleFileInput}
-                disabled={uploading}
-              />
+                <Input
+                  ref={fileInputRef}
+                  id="file-input"
+                  type="file"
+                  accept="video/*,audio/*"
+                  className="hidden"
+                  onChange={handleFileInput}
+                  disabled={uploading}
+                />
             </div>
 
             {/* Upload Progress */}
@@ -364,7 +369,7 @@ export const FileUploadHandler: React.FC<FileUploadHandlerProps> = ({
                 placeholder="https://example.com/video.mp4"
                 value={urlInput}
                 onChange={(e) => setUrlInput(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleUrlSubmit()}
+                onKeyDown={(e) => e.key === 'Enter' && handleUrlSubmit()}
               />
               <Button onClick={handleUrlSubmit} disabled={!urlInput.trim()}>
                 Load

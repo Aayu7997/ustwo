@@ -38,11 +38,14 @@ export const useGoogleDrive = () => {
       });
 
       if (error) {
-        // Fallback: Show message about Google Drive integration
+        const msg = (error as any)?.message?.toLowerCase?.() || '';
+        const isProviderDisabled = msg.includes('unsupported provider') || msg.includes('provider is not enabled') || (error as any)?.code === 'validation_failed';
         toast({
-          title: "Google Drive Integration",
-          description: "Google Drive integration requires OAuth setup in Supabase. Using local files for now.",
-          variant: "default"
+          title: isProviderDisabled ? "Google provider disabled" : "Google Drive Integration",
+          description: isProviderDisabled
+            ? "Enable Google provider in Supabase (Auth > Providers) and add Drive scope, then try again."
+            : "Google Drive integration requires OAuth setup in Supabase. Using local files for now.",
+          variant: isProviderDisabled ? "destructive" : "default"
         });
         setConnected(false);
       } else {
