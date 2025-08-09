@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, SUPABASE_URL } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { toast } from '@/hooks/use-toast';
 
@@ -70,29 +70,62 @@ export const useGoogleDrive = () => {
   const fetchDriveFiles = async () => {
     setLoading(true);
     try {
-      // Mock data for demonstration since Google Drive API may not be configured
-      const mockFiles: GoogleDriveFile[] = [
-        {
-          id: 'mock1',
-          name: 'Sample Video.mp4',
-          mimeType: 'video/mp4',
-          size: '52428800',
-          webViewLink: 'https://drive.google.com/file/d/mock1/view',
-          webContentLink: 'https://drive.google.com/uc?id=mock1'
-        }
-      ];
-      
-      setDriveFiles(mockFiles);
-      toast({
-        title: "Demo Mode",
-        description: "Showing sample files. Configure Google Drive OAuth in Supabase for real integration.",
+      // Try to get Google access token from the current session
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = (sessionData?.session as any)?.provider_token as string | undefined;
+
+      if (!accessToken) {
+        toast({
+          title: "Google not linked",
+          description: "Please sign in with Google to access Drive files.",
+          variant: "destructive"
+        });
+        setDriveFiles([]);
+        return;
+      }
+
+      const query = new URLSearchParams({
+        q: "(mimeType contains 'video/' or mimeType contains 'audio/') and trashed = false",
+        fields: "files(id,name,mimeType,size,thumbnailLink)",
+        pageSize: "25",
+        supportsAllDrives: "true",
+        includeItemsFromAllDrives: "true",
       });
-    } catch (error) {
+
+      const res = await fetch(`https://www.googleapis.com/drive/v3/files?${query.toString()}`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || `Drive list failed (${res.status})`);
+      }
+
+      const json = await res.json();
+      const files: GoogleDriveFile[] = (json.files || []).map((f: any) => ({
+        id: f.id,
+        name: f.name,
+        mimeType: f.mimeType,
+        size: f.size,
+        webViewLink: `https://drive.google.com/file/d/${f.id}/view`,
+        // Stream via edge function with Range + CORS support
+        webContentLink: `${SUPABASE_URL}/functions/v1/drive-proxy?fileId=${f.id}&token=${encodeURIComponent(accessToken)}`,
+        thumbnailLink: f.thumbnailLink,
+      }));
+
+      setDriveFiles(files);
+      toast({
+        title: "Google Drive Connected",
+        description: `Loaded ${files.length} media file(s) from Drive.`,
+      });
+    } catch (error: any) {
       console.error('Error fetching Google Drive files:', error);
       toast({
-        title: "Info",
-        description: "Google Drive API not configured. Please use local file upload instead.",
-        variant: "default"
+        title: "Google Drive Error",
+        description: error.message || "Unable to load Drive files.",
+        variant: "destructive"
       });
     } finally {
       setLoading(false);
