@@ -23,6 +23,6 @@ export default defineConfig(({ mode }) => ({
     global: 'globalThis',
   },
   optimizeDeps: {
-    include: ['simple-peer']
+    exclude: ['webtorrent']
   }
 }));

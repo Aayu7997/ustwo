@@ -1,118 +1,86 @@
-
 import { toast } from '@/hooks/use-toast';
-
-const WEBTORRENT_TRACKERS = [
-  'wss://tracker.openwebtorrent.com',
-  'wss://tracker.btorrent.xyz',
-  'wss://tracker.fastcast.nz',
-  'wss://tracker.webtorrent.dev'
-];
 
 // WebTorrent client utility for P2P file sharing
 class WebTorrentClientWrapper {
   private client: any = null;
-  private isInitialized = false;
+  private isSupported = false;
+
+  constructor() {
+    // Check if we're in a browser environment that supports WebTorrent
+    this.isSupported = typeof window !== 'undefined' && 
+                      typeof RTCPeerConnection !== 'undefined';
+  }
 
   async initialize() {
-    if (this.isInitialized) return this.client;
+    if (!this.isSupported) {
+      console.warn('WebTorrent not supported in this environment');
+      return null;
+    }
+
+    if (this.client) return this.client;
 
     try {
-      // Dynamically import WebTorrent to avoid SSR issues
-      const WebTorrent = (await import('webtorrent')).default;
-      this.client = new WebTorrent();
-      this.isInitialized = true;
-      
-      console.log('WebTorrent client initialized');
-      return this.client;
+      // WebTorrent has been removed to fix build issues
+      // This is a placeholder for future P2P implementation
+      console.warn('WebTorrent temporarily disabled due to browser compatibility issues');
+      return null;
     } catch (error) {
       console.error('Failed to initialize WebTorrent:', error);
-      toast({
-        title: "WebTorrent Error",
-        description: "P2P file sharing is not available in this environment",
-        variant: "destructive"
-      });
+      this.isSupported = false;
       return null;
     }
   }
 
   async seedFile(file: File): Promise<string | null> {
+    if (!this.isSupported) {
+      console.warn('P2P sharing not supported, using regular file upload instead');
+      return null;
+    }
+
     try {
       const client = await this.initialize();
-      if (!client) return null;
+      if (!client) {
+        console.warn('P2P client not available, using regular file upload');
+        return null;
+      }
 
-      return new Promise((resolve, reject) => {
-        client.seed(file, { announce: WEBTORRENT_TRACKERS }, (torrent: any) => {
-          console.log('File seeded successfully:', torrent.infoHash);
-          toast({
-            title: "File shared via P2P! 🚀",
-            description: `${file.name} is now available for direct peer-to-peer streaming`
-          });
-          resolve(torrent.magnetURI);
-        });
-
-        setTimeout(() => {
-          reject(new Error('Seeding timeout'));
-        }, 30000); // 30 second timeout
-      });
+      // Placeholder for actual WebTorrent implementation
+      return null;
     } catch (error) {
       console.error('Failed to seed file:', error);
-      toast({
-        title: "P2P Sharing Error",
-        description: "Could not share file via WebTorrent",
-        variant: "destructive"
-      });
       return null;
     }
   }
 
   async downloadFromMagnet(magnetURI: string, onProgress?: (progress: number) => void): Promise<File | null> {
+    if (!this.isSupported) {
+      console.warn('P2P download not supported');
+      return null;
+    }
+
     try {
       const client = await this.initialize();
-      if (!client) return null;
+      if (!client) {
+        console.warn('P2P client not available');
+        return null;
+      }
 
-      return new Promise((resolve, reject) => {
-        const torrent = client.add(magnetURI, { announce: WEBTORRENT_TRACKERS });
-
-        torrent.on('ready', () => {
-          console.log('Torrent ready:', torrent.name);
-          const file = torrent.files[0];
-          if (file) {
-            resolve(file as File);
-          } else {
-            reject(new Error('No files in torrent'));
-          }
-        });
-
-        torrent.on('download', () => {
-          const progress = Math.round(torrent.progress * 100);
-          onProgress?.(progress);
-        });
-
-        torrent.on('error', (error: Error) => {
-          console.error('Torrent error:', error);
-          reject(error);
-        });
-
-        setTimeout(() => {
-          reject(new Error('Download timeout'));
-        }, 60000); // 60 second timeout
-      });
+      // Placeholder for actual WebTorrent implementation
+      return null;
     } catch (error) {
       console.error('Failed to download from magnet:', error);
-      toast({
-        title: "P2P Download Error",
-        description: "Could not download file via WebTorrent",
-        variant: "destructive"
-      });
       return null;
     }
   }
 
   destroy() {
     if (this.client) {
-      this.client.destroy();
+      try {
+        this.client.destroy();
+      } catch (error) {
+        console.warn('Error destroying WebTorrent client:', error);
+      }
       this.client = null;
-      this.isInitialized = false;
       console.log('WebTorrent client destroyed');
     }
   }

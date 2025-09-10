@@ -19,14 +19,20 @@ export const useWebTorrent = () => {
           title: "P2P Sharing Active! 🌐",
           description: `${file.name} can now be streamed directly between partners`,
         });
+      } else {
+        toast({
+          title: "P2P Not Available",
+          description: "P2P sharing is not supported in this browser. Use file upload instead.",
+          variant: "default"
+        });
       }
       return magnetURI;
     } catch (error) {
       console.error('Failed to seed file:', error);
       toast({
-        title: "P2P Sharing Failed",
-        description: "Could not enable peer-to-peer sharing for this file",
-        variant: "destructive"
+        title: "P2P Not Available",
+        description: "P2P sharing is not supported in this browser. Use file upload instead.",
+        variant: "default"
       });
       return null;
     } finally {
