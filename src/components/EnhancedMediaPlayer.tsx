@@ -1,6 +1,6 @@
-
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import Plyr from 'plyr';
+import Hls from 'hls.js';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,24 +8,30 @@ import { Badge } from '@/components/ui/badge';
 import { useRealtimeSync } from '@/hooks/useRealtimeSync';
 import { useSmartSync } from '@/hooks/useSmartSync';
 import { useRoomPresence } from '@/hooks/useRoomPresence';
+import { useWebTorrent } from '@/hooks/useWebTorrent';
 import { FileUploadHandler } from './FileUploadHandler';
+import { YouTubePlayer } from './YouTubePlayer';
 import { 
   Play, 
   Users, 
   Wifi,
   WifiOff,
   Heart,
-  RotateCcw,
-  Upload
+  Upload,
+  AlertTriangle,
+  Volume2,
+  VolumeX
 } from 'lucide-react';
+import { toast } from '@/hooks/use-toast';
 import 'plyr/dist/plyr.css';
 
 interface MediaSource {
-  type: 'local' | 'url' | 'shared';
+  type: 'local' | 'url' | 'shared' | 'youtube' | 'hls' | 'p2p';
   url: string;
   file?: File;
   fileId?: string;
   title: string;
+  magnetURI?: string;
 }
 
 interface EnhancedMediaPlayerProps {
@@ -39,39 +45,135 @@ export const EnhancedMediaPlayer: React.FC<EnhancedMediaPlayerProps> = ({
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const playerRef = useRef<Plyr | null>(null);
+  const hlsRef = useRef<Hls | null>(null);
   const [mediaSource, setMediaSource] = useState<MediaSource | null>(null);
   const [isPlayerReady, setIsPlayerReady] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'connecting' | 'disconnected'>('disconnected');
   const [syncStatus, setSyncStatus] = useState<'synced' | 'syncing' | 'drift'>('synced');
   const [heartAnimation, setHeartAnimation] = useState(false);
   const [showSourceSelector, setShowSourceSelector] = useState(true);
+  const [playbackError, setPlaybackError] = useState<string | null>(null);
+  const [isMuted, setIsMuted] = useState(false);
 
   const { presenceUsers, partnerJoined, currentPartner, updateStatus } = useRoomPresence(roomId);
+  const { seedFile, downloadFromMagnet, isSeeding, isDownloading, downloadProgress } = useWebTorrent();
+
+  const detectMediaType = (url: string): MediaSource['type'] => {
+    const urlLower = url.toLowerCase();
+    
+    if (urlLower.includes('youtube.com') || urlLower.includes('youtu.be')) {
+      return 'youtube';
+    }
+    
+    if (urlLower.includes('.m3u8') || urlLower.includes('hls')) {
+      return 'hls';
+    }
+    
+    return 'url';
+  };
+
+  const extractYouTubeId = (url: string): string | null => {
+    const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
+    const match = url.match(regex);
+    return match ? match[1] : null;
+  };
 
   const handlePlaybackUpdate = useCallback((data: any) => {
-    if (!playerRef.current || !isPlayerReady) return;
+    if (!isPlayerReady) return;
 
-    const player = playerRef.current;
-    const currentTime = player.currentTime;
+    const currentTime = getCurrentTime();
     const timeDiff = Math.abs(currentTime - data.current_time_seconds);
 
     if (timeDiff > 1) {
       setSyncStatus('syncing');
-      player.currentTime = data.current_time_seconds;
-      
+      seekTo(data.current_time_seconds);
       setTimeout(() => setSyncStatus('synced'), 1000);
     }
 
-    if (data.is_playing !== !player.paused) {
+    if (data.is_playing !== isPlaying()) {
       if (data.is_playing) {
-        player.play();
+        playMedia();
       } else {
-        player.pause();
+        pauseMedia();
       }
     }
 
     onPlaybackStateChange?.(data);
   }, [isPlayerReady, onPlaybackStateChange]);
+
+  const getCurrentTime = (): number => {
+    if (mediaSource?.type === 'youtube') {
+      // YouTube player integration would go here
+      return 0;
+    }
+    return playerRef.current?.currentTime || 0;
+  };
+
+  const isPlaying = (): boolean => {
+    if (mediaSource?.type === 'youtube') {
+      // YouTube player integration would go here
+      return false;
+    }
+    return !playerRef.current?.paused;
+  };
+
+  const seekTo = (time: number) => {
+    if (mediaSource?.type === 'youtube') {
+      // YouTube player integration would go here
+      return;
+    }
+    if (playerRef.current) {
+      playerRef.current.currentTime = time;
+    }
+  };
+
+  const playMedia = async () => {
+    if (mediaSource?.type === 'youtube') {
+      // YouTube player integration would go here
+      return;
+    }
+    
+    if (playerRef.current) {
+      try {
+        await playerRef.current.play();
+      } catch (error) {
+        // Handle autoplay blocking
+        if (isMuted) {
+          toast({
+            title: "Autoplay blocked",
+            description: "Click the play button to start playback",
+            variant: "destructive"
+          });
+        } else {
+          setIsMuted(true);
+          if (videoRef.current) {
+            videoRef.current.muted = true;
+          }
+          try {
+            await playerRef.current.play();
+            toast({
+              title: "Playing muted",
+              description: "Video started muted due to browser policy. Click to unmute.",
+            });
+          } catch {
+            toast({
+              title: "Autoplay blocked",
+              description: "Click the play button to start playback",
+              variant: "destructive"
+            });
+          }
+        }
+      }
+    }
+  };
+
+  const pauseMedia = () => {
+    if (mediaSource?.type === 'youtube') {
+      // YouTube player integration would go here
+      return;
+    }
+    playerRef.current?.pause();
+  };
 
   const handleMediaSync = useCallback((data: any) => {
     setSyncStatus('syncing');
@@ -79,21 +181,19 @@ export const EnhancedMediaPlayer: React.FC<EnhancedMediaPlayerProps> = ({
   }, []);
 
   const handleSyncEvent = useCallback((event: any) => {
-    if (!playerRef.current || !isPlayerReady) return;
-
-    const player = playerRef.current;
+    if (!isPlayerReady) return;
     
     switch (event.type) {
       case 'play':
         updateStatus('watching');
-        player.play();
+        playMedia();
         break;
       case 'pause':
         updateStatus('paused');
-        player.pause();
+        pauseMedia();
         break;
       case 'seek':
-        player.currentTime = event.currentTime;
+        seekTo(event.currentTime);
         updateStatus('watching');
         break;
       case 'buffering':
@@ -115,12 +215,12 @@ export const EnhancedMediaPlayer: React.FC<EnhancedMediaPlayerProps> = ({
   const { metrics, isAutoSyncing, onBuffering, updateSyncTime, resetMetrics } = useSmartSync({
     onResync: () => {
       setSyncStatus('syncing');
-      if (playerRef.current) {
-        sendSyncEvent('seek', playerRef.current.currentTime, !playerRef.current.paused);
-      }
+      const currentTime = getCurrentTime();
+      const playing = isPlaying();
+      sendSyncEvent('seek', currentTime, playing);
     },
-    getCurrentTime: () => playerRef.current?.currentTime || 0,
-    isPlaying: () => !playerRef.current?.paused
+    getCurrentTime,
+    isPlaying
   });
 
   const triggerHeartAnimation = () => {
@@ -129,15 +229,67 @@ export const EnhancedMediaPlayer: React.FC<EnhancedMediaPlayerProps> = ({
   };
 
   const sendHeart = () => {
-    sendSyncEvent('heart', playerRef.current?.currentTime || 0, !playerRef.current?.paused);
+    const currentTime = getCurrentTime();
+    const playing = isPlaying();
+    sendSyncEvent('heart', currentTime, playing);
     triggerHeartAnimation();
   };
+
+  const setupHLS = useCallback((url: string) => {
+    if (!videoRef.current) return;
+
+    // Clean up existing HLS instance
+    if (hlsRef.current) {
+      hlsRef.current.destroy();
+    }
+
+    if (Hls.isSupported()) {
+      const hls = new Hls({
+        enableWorker: true,
+        lowLatencyMode: true,
+        backBufferLength: 90
+      });
+
+      hls.loadSource(url);
+      hls.attachMedia(videoRef.current);
+
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        console.log('HLS manifest parsed');
+        setPlaybackError(null);
+      });
+
+      hls.on(Hls.Events.ERROR, (event, data) => {
+        console.error('HLS error:', data);
+        if (data.fatal) {
+          setPlaybackError(`HLS Error: ${data.details}`);
+        }
+      });
+
+      hlsRef.current = hls;
+    } else if (videoRef.current.canPlayType('application/vnd.apple.mpegurl')) {
+      // Safari native HLS support
+      videoRef.current.src = url;
+    } else {
+      setPlaybackError('HLS not supported in this browser');
+    }
+  }, []);
 
   const initializePlayer = useCallback(() => {
     if (!videoRef.current || !mediaSource?.url) return;
 
+    setPlaybackError(null);
+
     if (playerRef.current) {
       playerRef.current.destroy();
+    }
+
+    // Handle different media types
+    if (mediaSource.type === 'hls') {
+      setupHLS(mediaSource.url);
+    } else {
+      // Standard video setup
+      videoRef.current.src = mediaSource.url;
+      videoRef.current.crossOrigin = 'anonymous';
     }
 
     const player = new Plyr(videoRef.current, {
@@ -209,6 +361,29 @@ export const EnhancedMediaPlayer: React.FC<EnhancedMediaPlayerProps> = ({
       updateStatus('watching');
     });
 
+    player.on('error', (event) => {
+      console.error('Plyr error:', event);
+      const error = videoRef.current?.error;
+      if (error) {
+        let errorMessage = 'Unknown playback error';
+        switch (error.code) {
+          case 1:
+            errorMessage = 'Video loading aborted';
+            break;
+          case 2:
+            errorMessage = 'Network error';
+            break;
+          case 3:
+            errorMessage = 'Video format not supported';
+            break;
+          case 4:
+            errorMessage = 'Video not found';
+            break;
+        }
+        setPlaybackError(errorMessage);
+      }
+    });
+
     const syncInterval = setInterval(() => {
       if (player && !player.paused) {
         sendPlaybackUpdate(player.currentTime, true);
@@ -222,30 +397,49 @@ export const EnhancedMediaPlayer: React.FC<EnhancedMediaPlayerProps> = ({
       if (player) {
         player.destroy();
       }
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+      }
     };
-  }, [mediaSource, sendPlaybackUpdate, sendSyncEvent, updateStatus, updateSyncTime, onBuffering]);
+  }, [mediaSource, sendPlaybackUpdate, sendSyncEvent, updateStatus, updateSyncTime, onBuffering, setupHLS]);
 
   useEffect(() => {
-    if (mediaSource) {
+    if (mediaSource && mediaSource.type !== 'youtube') {
       const cleanup = initializePlayer();
       return cleanup;
     }
   }, [initializePlayer]);
 
-  const handleFileSelect = (file: File, url: string) => {
+  const handleFileSelect = async (file: File, url: string) => {
+    const mediaType = detectMediaType(file.name);
+    
+    // Try P2P sharing for local files
+    let magnetURI = null;
+    if (file.size < 100 * 1024 * 1024) { // Only for files under 100MB
+      try {
+        magnetURI = await seedFile(file);
+        console.log('File seeded for P2P:', magnetURI);
+      } catch (error) {
+        console.warn('P2P seeding failed:', error);
+      }
+    }
+
     setMediaSource({
-      type: 'local',
+      type: magnetURI ? 'p2p' : 'local',
       url,
       file,
-      title: file.name
+      title: file.name,
+      magnetURI
     });
     setShowSourceSelector(false);
     resetMetrics();
   };
 
   const handleUrlSubmit = (url: string) => {
+    const mediaType = detectMediaType(url);
+    
     setMediaSource({
-      type: 'url',
+      type: mediaType,
       url,
       title: extractTitleFromUrl(url)
     });
@@ -266,6 +460,11 @@ export const EnhancedMediaPlayer: React.FC<EnhancedMediaPlayerProps> = ({
 
   const extractTitleFromUrl = (url: string): string => {
     try {
+      if (url.includes('youtube.com') || url.includes('youtu.be')) {
+        const videoId = extractYouTubeId(url);
+        return videoId ? `YouTube Video (${videoId})` : 'YouTube Video';
+      }
+      
       const urlObj = new URL(url);
       const pathname = urlObj.pathname;
       const filename = pathname.split('/').pop() || 'Video';
@@ -281,9 +480,14 @@ export const EnhancedMediaPlayer: React.FC<EnhancedMediaPlayerProps> = ({
     setIsPlayerReady(false);
     setConnectionStatus('disconnected');
     setSyncStatus('synced');
+    setPlaybackError(null);
     if (playerRef.current) {
       playerRef.current.destroy();
       playerRef.current = null;
+    }
+    if (hlsRef.current) {
+      hlsRef.current.destroy();
+      hlsRef.current = null;
     }
   };
 
@@ -295,6 +499,41 @@ export const EnhancedMediaPlayer: React.FC<EnhancedMediaPlayerProps> = ({
           onFileSelect={handleFileSelect}
           onUrlSubmit={handleUrlSubmit}
           onSharedFileSelect={handleSharedFileSelect}
+        />
+      </div>
+    );
+  }
+
+  // YouTube player rendering
+  if (mediaSource?.type === 'youtube') {
+    return (
+      <div className="space-y-4">
+        {/* Status Bar */}
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <Badge variant="default" className="bg-red-500">YouTube</Badge>
+                <div className="flex items-center gap-2">
+                  <Users className="w-4 h-4" />
+                  <span className="text-sm">{presenceUsers.length} connected</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="sm" onClick={resetPlayer}>
+                  <Upload className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <YouTubePlayer
+          videoId={extractYouTubeId(mediaSource.url)!}
+          onPlaybackUpdate={(currentTime, isPlaying) => {
+            sendPlaybackUpdate(currentTime, isPlaying);
+            sendSyncEvent(isPlaying ? 'play' : 'pause', currentTime, isPlaying);
+          }}
         />
       </div>
     );
@@ -324,10 +563,26 @@ export const EnhancedMediaPlayer: React.FC<EnhancedMediaPlayerProps> = ({
               <Badge variant={syncStatus === 'synced' ? 'default' : 'secondary'}>
                 {syncStatus === 'syncing' && isAutoSyncing ? 'Auto-syncing...' : syncStatus}
               </Badge>
+
+              {mediaSource?.type === 'hls' && (
+                <Badge variant="outline">HLS Stream</Badge>
+              )}
+
+              {mediaSource?.type === 'p2p' && (
+                <Badge variant="outline" className="bg-purple-100 dark:bg-purple-900">
+                  P2P Sharing
+                </Badge>
+              )}
               
               {currentPartner && (
                 <Badge variant="outline">
                   Partner: {currentPartner.status}
+                </Badge>
+              )}
+
+              {(isSeeding || isDownloading) && (
+                <Badge variant="outline" className="bg-blue-100 dark:bg-blue-900">
+                  {isSeeding ? 'Seeding' : `Downloading ${downloadProgress}%`}
                 </Badge>
               )}
             </div>
@@ -341,6 +596,22 @@ export const EnhancedMediaPlayer: React.FC<EnhancedMediaPlayerProps> = ({
               >
                 <Heart className={`w-4 h-4 ${heartAnimation ? 'animate-ping' : ''}`} />
               </Button>
+
+              {isMuted && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setIsMuted(false);
+                    if (videoRef.current) {
+                      videoRef.current.muted = false;
+                    }
+                  }}
+                  className="text-red-500"
+                >
+                  <VolumeX className="w-4 h-4" />
+                </Button>
+              )}
               
               <Button variant="ghost" size="sm" onClick={resetPlayer}>
                 <Upload className="w-4 h-4" />
@@ -348,6 +619,19 @@ export const EnhancedMediaPlayer: React.FC<EnhancedMediaPlayerProps> = ({
             </div>
           </div>
           
+          {playbackError && (
+            <div className="mt-3 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+              <div className="flex items-center gap-2 text-red-700 dark:text-red-300">
+                <AlertTriangle className="w-4 h-4" />
+                <span className="text-sm font-medium">Playback Error</span>
+              </div>
+              <p className="text-sm text-red-600 dark:text-red-400 mt-1">{playbackError}</p>
+              <p className="text-xs text-red-500 dark:text-red-500 mt-2">
+                Try a different source or use screen sharing as fallback
+              </p>
+            </div>
+          )}
+
           {metrics.latency > 0 && (
             <div className="mt-3 grid grid-cols-4 gap-4 text-xs text-muted-foreground">
               <div>Latency: {metrics.latency}ms</div>
@@ -370,10 +654,10 @@ export const EnhancedMediaPlayer: React.FC<EnhancedMediaPlayerProps> = ({
             <div className="relative">
               <video
                 ref={videoRef}
-                src={mediaSource?.url}
                 className="w-full h-auto"
                 crossOrigin="anonymous"
                 playsInline
+                muted={isMuted}
               />
               
               <AnimatePresence>
@@ -389,11 +673,14 @@ export const EnhancedMediaPlayer: React.FC<EnhancedMediaPlayerProps> = ({
                 )}
               </AnimatePresence>
               
-              {!isPlayerReady && (
+              {!isPlayerReady && !playbackError && (
                 <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
                   <div className="text-center text-white">
                     <div className="w-8 h-8 border-4 border-white border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
                     <p>Loading player...</p>
+                    {mediaSource?.type === 'hls' && (
+                      <p className="text-sm mt-2">Setting up HLS stream...</p>
+                    )}
                   </div>
                 </div>
               )}
@@ -406,7 +693,9 @@ export const EnhancedMediaPlayer: React.FC<EnhancedMediaPlayerProps> = ({
                     <h3 className="font-medium">{mediaSource.title}</h3>
                     <p className="text-sm text-muted-foreground capitalize">
                       {mediaSource.type === 'shared' ? 'Shared file - synced automatically' : 
-                       mediaSource.type === 'local' ? 'Local file - upload to share with partner' :
+                       mediaSource.type === 'local' ? 'Local file - sharing with P2P if supported' :
+                       mediaSource.type === 'p2p' ? 'P2P shared - streaming directly between devices' :
+                       mediaSource.type === 'hls' ? 'HLS stream - synced automatically' :
                        'URL source - synced automatically'}
                     </p>
                   </div>

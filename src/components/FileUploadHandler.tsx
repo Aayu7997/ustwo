@@ -366,7 +366,7 @@ export const FileUploadHandler: React.FC<FileUploadHandlerProps> = ({
             <Label className="text-sm font-medium">Media URL</Label>
             <div className="flex gap-2">
               <Input
-                placeholder="https://example.com/video.mp4"
+                placeholder="https://youtube.com/watch?v=... or https://example.com/video.mp4"
                 value={urlInput}
                 onChange={(e) => setUrlInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleUrlSubmit()}
@@ -376,7 +376,10 @@ export const FileUploadHandler: React.FC<FileUploadHandlerProps> = ({
               </Button>
             </div>
             <div className="text-xs text-muted-foreground space-y-1">
-              <p>• YouTube, Vimeo, direct links supported</p>
+              <p>• <strong>YouTube:</strong> youtube.com, youtu.be links (embedded player)</p>
+              <p>• <strong>HLS Streams:</strong> .m3u8 live streams and VOD</p>
+              <p>• <strong>Direct Video:</strong> .mp4, .webm, .mov files</p>
+              <p>• <strong>Google Drive:</strong> Public drive.google.com sharing links</p>
               <p>• All URLs sync automatically between partners</p>
             </div>
           </div>
