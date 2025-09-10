@@ -71,14 +71,70 @@ const Auth: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 to-secondary/5 p-4">
+    <div className="min-h-screen relative flex items-center justify-center overflow-hidden p-4">
+      {/* Animated Background */}
+      <div className="absolute inset-0 bg-gradient-to-br from-pink-50 via-purple-50 to-indigo-50 dark:from-gray-900 dark:via-purple-900/20 dark:to-pink-900/20"></div>
+      
+      {/* Floating Hearts Animation */}
+      <div className="absolute inset-0 overflow-hidden">
+        {[...Array(12)].map((_, i) => (
+          <motion.div
+            key={i}
+            className="absolute"
+            initial={{
+              x: Math.random() * window.innerWidth,
+              y: window.innerHeight + 100,
+              rotate: 0,
+              scale: 0.5 + Math.random() * 0.5,
+            }}
+            animate={{
+              y: -100,
+              rotate: 360,
+              x: Math.random() * window.innerWidth,
+            }}
+            transition={{
+              duration: 15 + Math.random() * 10,
+              repeat: Infinity,
+              delay: Math.random() * 5,
+              ease: "linear"
+            }}
+            style={{
+              left: `${Math.random() * 100}%`,
+            }}
+          >
+            <Heart 
+              className={`w-4 h-4 text-pink-200 dark:text-pink-700 opacity-20`}
+              fill="currentColor"
+            />
+          </motion.div>
+        ))}
+      </div>
+
+      {/* Gradient Orbs */}
+      <div className="absolute top-1/4 left-1/4 w-72 h-72 bg-gradient-to-r from-pink-300/30 to-purple-300/30 rounded-full blur-3xl animate-pulse"></div>
+      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-gradient-to-r from-purple-300/20 to-indigo-300/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
+      <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-gradient-to-r from-indigo-300/10 to-pink-300/10 rounded-full blur-3xl animate-pulse delay-2000"></div>
+      
+      {/* Geometric Patterns */}
+      <div className="absolute inset-0 opacity-5 dark:opacity-10">
+        <svg className="w-full h-full" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <pattern id="hearts" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
+              <path d="M10 15C7 12 1 12 1 8C1 5 3 3 6 3C8 3 9 4 10 6C11 4 12 3 14 3C17 3 19 5 19 8C19 12 13 12 10 15Z" fill="currentColor"/>
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#hearts)" className="text-pink-200 dark:text-pink-800"/>
+        </svg>
+      </div>
+
+      {/* Main Content */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="w-full max-w-md"
+        className="relative z-10 w-full max-w-md"
       >
-        <Card className="shadow-xl border-0 bg-card/95 backdrop-blur-sm">
+        <Card className="shadow-2xl border-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border border-white/20 dark:border-gray-700/20">
           <CardHeader className="text-center space-y-4">
             <motion.div
               initial={{ scale: 0 }}
@@ -86,13 +142,13 @@ const Auth: React.FC = () => {
               transition={{ delay: 0.2, type: "spring" }}
               className="flex justify-center"
             >
-              <div className="w-16 h-16 bg-gradient-to-r from-primary to-secondary rounded-full flex items-center justify-center">
+              <div className="w-16 h-16 bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 rounded-full flex items-center justify-center shadow-lg animate-pulse">
                 <Heart className="w-8 h-8 text-white" fill="currentColor" />
               </div>
             </motion.div>
             <div>
-              <CardTitle className="text-2xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                {isLogin ? 'Welcome Back' : 'Join LoveSync'}
+              <CardTitle className="text-2xl font-bold bg-gradient-to-r from-pink-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent">
+                {isLogin ? 'Welcome Back' : 'Join UsTwo'}
               </CardTitle>
               <CardDescription className="mt-2">
                 {isLogin 
