@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useRoom, Room as RoomType } from '@/hooks/useRoom';
 import { useAuth } from '@/hooks/useAuth';
-import { EnhancedMediaPlayer } from '@/components/EnhancedMediaPlayer';
+import { EnhancedVideoPlayer } from '@/components/EnhancedVideoPlayer';
 import { FloatingHearts } from '@/components/FloatingHearts';
 import { ChatWidget } from '@/components/ChatWidget';
 import { WatchPartyEffects } from '@/components/WatchPartyEffects';
@@ -11,7 +11,7 @@ import { ExtensionBridge } from '@/components/ExtensionBridge';
 import { RoomControls } from '@/components/RoomControls';
 import { VideoCall } from '@/components/VideoCall';
 import { PartnerPresence } from '@/components/PartnerPresence';
-import { PersonalNotes } from '@/components/PersonalNotes';
+
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Heart } from 'lucide-react';
 
@@ -103,26 +103,17 @@ const Room: React.FC = () => {
           </motion.div>
         )}
 
-        {/* Video Call & Personal Notes */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {roomId && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-            >
-              <VideoCall roomId={roomId} />
-            </motion.div>
-          )}
-          
+        {/* Video Call */}
+        {roomId && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
+            transition={{ delay: 0.3 }}
+            className="max-w-4xl mx-auto"
           >
-            <PersonalNotes />
+            <VideoCall roomId={roomId} />
           </motion.div>
-        </div>
+        )}
 
         {/* Media Player */}
         {roomId && (
@@ -139,7 +130,7 @@ const Room: React.FC = () => {
                 All play, pause, seek, and buffering events are shared in real-time.
               </p>
             </div>
-            <EnhancedMediaPlayer 
+            <EnhancedVideoPlayer 
               roomId={roomId} 
               onPlaybackStateChange={(state) => {
                 setPlaybackState({

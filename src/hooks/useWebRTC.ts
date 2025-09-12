@@ -266,6 +266,7 @@ export const useWebRTC = ({ roomId, enabled }: WebRTCProps) => {
     remoteStream,
     isInitiator,
     startCall,
-    endCall
+    endCall,
+    peer
   };
 };
