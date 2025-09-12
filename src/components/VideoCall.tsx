@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useWebRTC } from '@/hooks/useWebRTC';
 import { Button } from '@/components/ui/button';
-import { Video, VideoOff, Phone, PhoneOff, Minimize2, Maximize2 } from 'lucide-react';
+import { Video, VideoOff, Phone, PhoneOff, Minimize2, Maximize2, Mic, MicOff } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 
 interface VideoCallProps {
@@ -13,6 +13,8 @@ export const VideoCall: React.FC<VideoCallProps> = ({ roomId }) => {
   const [isEnabled, setIsEnabled] = useState(false);
   const [isPiP, setIsPiP] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
+  const [isAudioEnabled, setIsAudioEnabled] = useState(true);
+  const [isVideoEnabled, setIsVideoEnabled] = useState(true);
   
   const {
     localVideoRef,
@@ -43,6 +45,26 @@ export const VideoCall: React.FC<VideoCallProps> = ({ roomId }) => {
   const toggleMinimize = () => {
     setIsMinimized(!isMinimized);
     setIsPiP(false);
+  };
+
+  const toggleAudio = () => {
+    if (stream) {
+      const audioTrack = stream.getAudioTracks()[0];
+      if (audioTrack) {
+        audioTrack.enabled = !audioTrack.enabled;
+        setIsAudioEnabled(audioTrack.enabled);
+      }
+    }
+  };
+
+  const toggleVideo = () => {
+    if (stream) {
+      const videoTrack = stream.getVideoTracks()[0];
+      if (videoTrack) {
+        videoTrack.enabled = !videoTrack.enabled;
+        setIsVideoEnabled(videoTrack.enabled);
+      }
+    }
   };
 
   if (!isEnabled && !stream) {
@@ -135,6 +157,24 @@ export const VideoCall: React.FC<VideoCallProps> = ({ roomId }) => {
               </div>
 
               <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={toggleAudio}
+                  className={`${isAudioEnabled ? 'bg-white/20' : 'bg-red-500'} hover:bg-white/30 text-white border-white/30`}
+                >
+                  {isAudioEnabled ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
+                </Button>
+                
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={toggleVideo}
+                  className={`${isVideoEnabled ? 'bg-white/20' : 'bg-red-500'} hover:bg-white/30 text-white border-white/30`}
+                >
+                  {isVideoEnabled ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
+                </Button>
+                
                 <Button
                   size="sm"
                   variant="outline"

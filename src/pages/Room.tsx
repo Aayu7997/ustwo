@@ -9,8 +9,9 @@ import { ChatWidget } from '@/components/ChatWidget';
 import { WatchPartyEffects } from '@/components/WatchPartyEffects';
 import { ExtensionBridge } from '@/components/ExtensionBridge';
 import { RoomControls } from '@/components/RoomControls';
-import { EnhancedVideoCall } from '@/components/EnhancedVideoCall';
+import { VideoCall } from '@/components/VideoCall';
 import { PartnerPresence } from '@/components/PartnerPresence';
+import { PersonalNotes } from '@/components/PersonalNotes';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Heart } from 'lucide-react';
 
@@ -102,16 +103,26 @@ const Room: React.FC = () => {
           </motion.div>
         )}
 
-        {/* Video Call */}
-        {roomId && (
+        {/* Video Call & Personal Notes */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {roomId && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+            >
+              <VideoCall roomId={roomId} />
+            </motion.div>
+          )}
+          
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
+            transition={{ delay: 0.4 }}
           >
-            <EnhancedVideoCall roomId={roomId} />
+            <PersonalNotes />
           </motion.div>
-        )}
+        </div>
 
         {/* Media Player */}
         {roomId && (

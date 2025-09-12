@@ -413,30 +413,28 @@ export const EnhancedMediaPlayer: React.FC<EnhancedMediaPlayerProps> = ({
   const handleFileSelect = async (file: File, url: string) => {
     const mediaType = detectMediaType(file.name);
     
-    // Try P2P sharing for local files
-    let magnetURI = null;
-    if (file.size < 100 * 1024 * 1024) { // Only for files under 100MB
-      try {
-        magnetURI = await seedFile(file);
-        console.log('File seeded for P2P:', magnetURI);
-      } catch (error) {
-        console.warn('P2P seeding failed:', error);
-      }
-    }
-
+    console.log('Selected file:', file.name, 'Size:', file.size, 'Type:', file.type);
+    
     setMediaSource({
-      type: magnetURI ? 'p2p' : 'local',
+      type: 'local',
       url,
       file,
-      title: file.name,
-      magnetURI
+      title: file.name
     });
     setShowSourceSelector(false);
     resetMetrics();
+    
+    // Show success message
+    toast({
+      title: "Media Loaded! 🎬",
+      description: `Playing ${file.name} locally`
+    });
   };
 
   const handleUrlSubmit = (url: string) => {
     const mediaType = detectMediaType(url);
+    
+    console.log('Loading URL:', url, 'Detected type:', mediaType);
     
     setMediaSource({
       type: mediaType,
@@ -445,6 +443,12 @@ export const EnhancedMediaPlayer: React.FC<EnhancedMediaPlayerProps> = ({
     });
     setShowSourceSelector(false);
     resetMetrics();
+    
+    // Show success message
+    toast({
+      title: "Media Source Added! 🎬",
+      description: `Loading ${mediaType === 'youtube' ? 'YouTube video' : mediaType === 'hls' ? 'HLS stream' : 'video'}`
+    });
   };
 
   const handleSharedFileSelect = (fileId: string, url: string, fileName: string) => {

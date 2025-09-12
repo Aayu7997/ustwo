@@ -100,14 +100,12 @@ export const useNotes = (partnerId?: string) => {
     if (!isPersonal && !receiverId) {
       const effectivePartnerId = getEffectivePartnerId();
       if (!effectivePartnerId) {
-        toast({
-          title: "Error",
-          description: "No partner found to send note to",
-          variant: "destructive"
-        });
-        return null;
+        // Allow personal notes if no partner found
+        console.log('No partner found, creating personal note instead');
+        isPersonal = true;
+      } else {
+        receiverId = effectivePartnerId;
       }
-      receiverId = effectivePartnerId;
     }
 
     try {
