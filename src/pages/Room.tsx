@@ -111,7 +111,7 @@ const Room: React.FC = () => {
             transition={{ delay: 0.3 }}
             className="max-w-4xl mx-auto"
           >
-            <VideoCall roomId={roomId} />
+            <VideoCall roomId={roomId} roomCode={currentRoom?.room_code} />
           </motion.div>
         )}
 
@@ -131,7 +131,8 @@ const Room: React.FC = () => {
               </p>
             </div>
             <EnhancedVideoPlayer 
-              roomId={roomId} 
+              roomId={roomId}
+              roomCode={currentRoom?.room_code}
               onPlaybackStateChange={(state) => {
                 setPlaybackState({
                   isPlaying: state.is_playing || false,

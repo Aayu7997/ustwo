@@ -187,6 +187,14 @@ export const useThemes = () => {
     document.body.className = document.body.className.replace(/theme-\w+/g, '');
     document.body.classList.add(`theme-${theme.id}`);
     
+    // Update the dark class based on theme colors
+    const isDark = theme.colors.background.split(' ')[2].replace('%', '') < '50';
+    if (isDark) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+    
     setCurrentTheme(theme);
     
     // Store theme preference

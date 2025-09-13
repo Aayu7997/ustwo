@@ -1,13 +1,13 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { Slider } from '@/components/ui/slider';
-import { Badge } from '@/components/ui/badge';
+import { Card } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Switch } from '@/components/ui/switch';
+import { Slider } from '@/components/ui/slider';
+import { toast } from '@/hooks/use-toast';
 import { 
   Play, 
   Pause, 
@@ -15,28 +15,46 @@ import {
   VolumeX, 
   Maximize, 
   Minimize, 
+  SkipBack, 
+  SkipForward,
+  Upload,
+  Link as LinkIcon,
+  Youtube,
   Settings,
   Download,
-  Share2,
-  RotateCcw,
-  FastForward,
-  Rewind,
-  Monitor,
-  Smartphone,
-  Tablet
+  Wifi
 } from 'lucide-react';
-import { toast } from '@/components/ui/use-toast';
+import Hls from 'hls.js';
+import { useRoom } from '@/hooks/useRoom';
+import { useWebTorrent } from '@/hooks/useWebTorrent';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 
 interface EnhancedVideoPlayerProps {
   roomId: string;
+  roomCode?: string;
   onPlaybackStateChange?: (state: any) => void;
 }
 
-export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
-  roomId,
-  onPlaybackStateChange
+export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({ 
+  roomId, 
+  roomCode,
+  onPlaybackStateChange 
 }) => {
+  const { user } = useAuth();
+  const { updatePlaybackState } = useRoom(roomId);
+  const { 
+    seedFile, 
+    isSeeding, 
+    downloadProgress, 
+    torrentData, 
+    createVideoElement 
+  } = useWebTorrent(roomId, roomCode);
+
   const videoRef = useRef<HTMLVideoElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const hlsRef = useRef<Hls | null>(null);
+  
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -44,13 +62,21 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
   const [isMuted, setIsMuted] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
-  const [currentSource, setCurrentSource] = useState('');
-  const [sourceType, setSourceType] = useState<'url' | 'file' | 'youtube'>('url');
-  const [quality, setQuality] = useState('auto');
-  const [showSettings, setShowSettings] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Update playback state
+  // Media source states
+  const [videoSrc, setVideoSrc] = useState('');
+  const [youtubeUrl, setYoutubeUrl] = useState('');
+  const [directUrl, setDirectUrl] = useState('');
+  const [currentFile, setCurrentFile] = useState<File | null>(null);
+  const [currentMediaType, setCurrentMediaType] = useState<'local' | 'url' | 'youtube' | 'hls' | 'torrent'>('local');
+  
+  // Settings
+  const [enableP2P, setEnableP2P] = useState(true);
+  const [quality, setQuality] = useState('auto');
+  const [enableSync, setEnableSync] = useState(true);
+
+  // Update playback state callback
   useEffect(() => {
     onPlaybackStateChange?.({
       is_playing: isPlaying,
@@ -59,82 +85,70 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
     });
   }, [isPlaying, currentTime, duration, onPlaybackStateChange]);
 
-  const handleLoadSource = async () => {
-    if (!currentSource.trim()) {
-      toast({
-        title: "No source provided",
-        description: "Please enter a video URL or upload a file",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (!videoRef.current) return;
-
-    setIsLoading(true);
-    
-    try {
-      if (sourceType === 'youtube') {
-        // Handle YouTube URLs
-        const videoId = extractYouTubeId(currentSource);
-        if (videoId) {
-          toast({
-            title: "YouTube Integration",
-            description: "YouTube videos require the YouTube component for proper playback",
-          });
-        }
-      } else if (sourceType === 'url') {
-        videoRef.current.src = currentSource;
-        await videoRef.current.load();
-        toast({
-          title: "Video loaded successfully! 🎬",
-          description: "Your video is ready to play"
+  // Video event handlers
+  const handleTimeUpdate = useCallback(() => {
+    if (videoRef.current) {
+      const time = videoRef.current.currentTime;
+      setCurrentTime(time);
+      
+      if (enableSync && Math.abs(time - currentTime) > 1) {
+        updatePlaybackState({
+          current_time_seconds: time,
+          is_playing: isPlaying
         });
       }
-    } catch (error) {
-      console.error('Error loading video:', error);
-      toast({
-        title: "Loading Error",
-        description: "Failed to load video. Please check the URL and try again.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoading(false);
     }
-  };
+  }, [currentTime, isPlaying, enableSync, updatePlaybackState]);
 
-  const extractYouTubeId = (url: string): string | null => {
-    const regex = /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/;
-    const match = url.match(regex);
-    return match ? match[1] : null;
-  };
-
-  const handlePlay = () => {
-    if (videoRef.current) {
-      if (isPlaying) {
-        videoRef.current.pause();
-      } else {
-        videoRef.current.play();
-      }
-    }
-  };
-
-  const handleTimeUpdate = () => {
-    if (videoRef.current) {
-      setCurrentTime(videoRef.current.currentTime);
-    }
-  };
-
-  const handleLoadedMetadata = () => {
+  const handleLoadedMetadata = useCallback(() => {
     if (videoRef.current) {
       setDuration(videoRef.current.duration);
+    }
+  }, []);
+
+  const handlePlay = useCallback(() => {
+    setIsPlaying(true);
+    if (enableSync) {
+      updatePlaybackState({
+        current_time_seconds: currentTime,
+        is_playing: true
+      });
+    }
+  }, [currentTime, enableSync, updatePlaybackState]);
+
+  const handlePause = useCallback(() => {
+    setIsPlaying(false);
+    if (enableSync) {
+      updatePlaybackState({
+        current_time_seconds: currentTime,
+        is_playing: false
+      });
+    }
+  }, [currentTime, enableSync, updatePlaybackState]);
+
+  // Playback controls
+  const togglePlayPause = () => {
+    if (!videoRef.current) return;
+    
+    if (isPlaying) {
+      videoRef.current.pause();
+    } else {
+      videoRef.current.play();
     }
   };
 
   const handleSeek = (value: number[]) => {
     if (videoRef.current) {
-      videoRef.current.currentTime = value[0];
-      setCurrentTime(value[0]);
+      const time = (value[0] / 100) * duration;
+      videoRef.current.currentTime = time;
+      setCurrentTime(time);
+      
+      if (enableSync) {
+        updatePlaybackState({
+          current_time_seconds: time,
+          is_playing: isPlaying
+        });
+      }
     }
   };
 
@@ -169,274 +183,439 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
     }
   };
 
-  const changePlaybackSpeed = (speed: number) => {
-    if (videoRef.current) {
-      videoRef.current.playbackRate = speed;
-      setPlaybackSpeed(speed);
+  // File handling
+  const handleFileSelect = async (files: FileList | null) => {
+    if (files && files.length > 0) {
+      const file = files[0];
+      
+      if (file.type.startsWith('video/')) {
+        // Check if we should seed via WebTorrent
+        if (enableP2P && roomCode) {
+          setCurrentFile(file);
+          setCurrentMediaType('torrent');
+          
+          const magnetURI = await seedFile(file);
+          if (magnetURI) {
+            toast({
+              title: "File Shared via P2P! 🌐",
+              description: `${file.name} is being shared with your partner`
+            });
+          } else {
+            // Fallback to local playback
+            const url = URL.createObjectURL(file);
+            setVideoSrc(url);
+            setCurrentMediaType('local');
+          }
+        } else {
+          const url = URL.createObjectURL(file);
+          setVideoSrc(url);
+          setCurrentMediaType('local');
+        }
+        
+        setCurrentFile(file);
+        
+        toast({
+          title: "Local Video Loaded! 🎬",
+          description: `${file.name} is ready to play`
+        });
+      } else {
+        toast({
+          title: "Invalid File Type",
+          description: "Please select a video file",
+          variant: "destructive"
+        });
+      }
     }
   };
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file && videoRef.current) {
-      const url = URL.createObjectURL(file);
-      videoRef.current.src = url;
-      setCurrentSource(file.name);
-      setSourceType('file');
+  const handleDirectUrlLoad = async () => {
+    if (!directUrl.trim()) {
       toast({
-        title: "File loaded! 📹",
-        description: `${file.name} is ready to play`
+        title: "No URL provided",
+        description: "Please enter a video URL",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    
+    try {
+      // Check if it's an HLS stream
+      if (directUrl.includes('.m3u8')) {
+        if (Hls.isSupported()) {
+          if (hlsRef.current) {
+            hlsRef.current.destroy();
+          }
+          
+          hlsRef.current = new Hls();
+          hlsRef.current.loadSource(directUrl);
+          hlsRef.current.attachMedia(videoRef.current!);
+          
+          setCurrentMediaType('hls');
+          toast({
+            title: "HLS Stream Loaded! 📺",
+            description: "Live stream is ready to play"
+          });
+        } else {
+          toast({
+            title: "HLS Not Supported",
+            description: "Your browser doesn't support HLS streaming",
+            variant: "destructive"
+          });
+        }
+      } else {
+        // Regular video URL
+        setVideoSrc(directUrl);
+        setCurrentMediaType('url');
+        
+        toast({
+          title: "Video URL Loaded! 🎬",
+          description: "Video is ready to play"
+        });
+      }
+    } catch (error) {
+      console.error('Error loading video URL:', error);
+      toast({
+        title: "Loading Error",
+        description: "Failed to load video. Please check the URL.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const extractYouTubeId = (url: string): string | null => {
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+    const match = url.match(regExp);
+    return (match && match[2].length === 11) ? match[2] : null;
+  };
+
+  const handleYouTubeLoad = () => {
+    const videoId = extractYouTubeId(youtubeUrl);
+    if (videoId) {
+      // Create embedded YouTube player URL
+      const embedUrl = `https://www.youtube.com/embed/${videoId}?enablejsapi=1&origin=${window.location.origin}`;
+      setVideoSrc(embedUrl);
+      setCurrentMediaType('youtube');
+      
+      toast({
+        title: "YouTube Video Loaded! 📺",
+        description: "YouTube video is ready to play"
+      });
+    } else {
+      toast({
+        title: "Invalid YouTube URL",
+        description: "Please enter a valid YouTube URL",
+        variant: "destructive"
       });
     }
   };
 
-  const formatTime = (seconds: number): string => {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
+  // Listen for torrent downloads
+  useEffect(() => {
+    if (torrentData && currentMediaType !== 'torrent') {
+      toast({
+        title: "Partner shared a file! 🎉",
+        description: "File is being downloaded via P2P",
+      });
+    }
+  }, [torrentData, currentMediaType]);
+
+  // Setup video element
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    video.addEventListener('timeupdate', handleTimeUpdate);
+    video.addEventListener('loadedmetadata', handleLoadedMetadata);
+    video.addEventListener('play', handlePlay);
+    video.addEventListener('pause', handlePause);
+
+    return () => {
+      video.removeEventListener('timeupdate', handleTimeUpdate);
+      video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      video.removeEventListener('play', handlePlay);
+      video.removeEventListener('pause', handlePause);
+    };
+  }, [handleTimeUpdate, handleLoadedMetadata, handlePlay, handlePause]);
+
+  // Update video source
+  useEffect(() => {
+    if (videoRef.current && videoSrc && currentMediaType !== 'torrent') {
+      videoRef.current.src = videoSrc;
+    }
+  }, [videoSrc, currentMediaType]);
 
   return (
-    <Card className="w-full bg-card/95 backdrop-blur-sm border-border/50">
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between">
-          <span>Enhanced Video Player</span>
-          <div className="flex gap-2">
-            <Badge variant="outline" className="gap-1">
-              <Monitor className="h-3 w-3" />
-              {quality}
-            </Badge>
-            <Badge variant="outline">{playbackSpeed}x</Badge>
-          </div>
-        </CardTitle>
-      </CardHeader>
-
-      <CardContent className="space-y-6">
-        {/* Source Selection */}
-        <Tabs value={sourceType} onValueChange={(value: any) => setSourceType(value)}>
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="url">URL</TabsTrigger>
-            <TabsTrigger value="file">File</TabsTrigger>
-            <TabsTrigger value="youtube">YouTube</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="url" className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="video-url">Video URL</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="video-url"
-                  placeholder="https://example.com/video.mp4"
-                  value={currentSource}
-                  onChange={(e) => setCurrentSource(e.target.value)}
-                />
-                <Button onClick={handleLoadSource} disabled={isLoading}>
-                  {isLoading ? "Loading..." : "Load"}
-                </Button>
-              </div>
-            </div>
-          </TabsContent>
-          
-          <TabsContent value="file" className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="video-file">Upload Video File</Label>
-              <Input
-                id="video-file"
-                type="file"
-                accept="video/*"
-                onChange={handleFileUpload}
-              />
-            </div>
-          </TabsContent>
-          
-          <TabsContent value="youtube" className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="youtube-url">YouTube URL</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="youtube-url"
-                  placeholder="https://youtube.com/watch?v=..."
-                  value={currentSource}
-                  onChange={(e) => setCurrentSource(e.target.value)}
-                />
-                <Button onClick={handleLoadSource} disabled={isLoading}>
-                  Load
-                </Button>
-              </div>
-            </div>
-          </TabsContent>
-        </Tabs>
-
-        {/* Video Player */}
-        <div className="relative bg-black rounded-lg overflow-hidden">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="w-full max-w-4xl mx-auto space-y-4"
+    >
+      <Card className="overflow-hidden">
+        <div className="relative bg-black">
+          {/* Video Element */}
           <video
             ref={videoRef}
-            className="w-full aspect-video"
-            onPlay={() => setIsPlaying(true)}
-            onPause={() => setIsPlaying(false)}
-            onTimeUpdate={handleTimeUpdate}
-            onLoadedMetadata={handleLoadedMetadata}
+            className="w-full aspect-video object-contain"
             controls={false}
+            playsInline
           />
           
+          {/* Loading Overlay */}
           {isLoading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-              <div className="text-white text-center">
-                <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+              <div className="text-center text-white">
+                <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
                 <p>Loading video...</p>
               </div>
             </div>
           )}
-        </div>
 
-        {/* Controls */}
-        <div className="space-y-4">
-          {/* Progress Bar */}
-          <div className="space-y-2">
-            <Slider
-              value={[currentTime]}
-              max={duration || 100}
-              step={1}
-              onValueChange={handleSeek}
-              className="w-full"
-            />
-            <div className="flex justify-between text-sm text-muted-foreground">
-              <span>{formatTime(currentTime)}</span>
-              <span>{formatTime(duration)}</span>
-            </div>
-          </div>
-
-          {/* Main Controls */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => videoRef.current && (videoRef.current.currentTime -= 10)}
-              >
-                <Rewind className="h-4 w-4" />
-              </Button>
-              
-              <Button onClick={handlePlay} size="sm">
-                {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-              </Button>
-              
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => videoRef.current && (videoRef.current.currentTime += 10)}
-              >
-                <FastForward className="h-4 w-4" />
-              </Button>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={toggleMute}
-              >
-                {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
-              </Button>
-              
-              <div className="w-20">
-                <Slider
-                  value={[isMuted ? 0 : volume]}
-                  max={100}
-                  step={1}
-                  onValueChange={handleVolumeChange}
-                />
+          {/* P2P Download Progress */}
+          {downloadProgress > 0 && downloadProgress < 100 && (
+            <div className="absolute inset-0 bg-black/75 flex items-center justify-center">
+              <div className="text-center text-white space-y-2">
+                <Wifi className="w-8 h-8 mx-auto animate-pulse" />
+                <p>Downloading via P2P...</p>
+                <div className="w-48 bg-gray-700 rounded-full h-2">
+                  <div 
+                    className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${downloadProgress}%` }}
+                  />
+                </div>
+                <p className="text-sm">{downloadProgress}%</p>
               </div>
-              
-              <Select value={playbackSpeed.toString()} onValueChange={(value) => changePlaybackSpeed(parseFloat(value))}>
-                <SelectTrigger className="w-16 h-8">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="0.5">0.5x</SelectItem>
-                  <SelectItem value="0.75">0.75x</SelectItem>
-                  <SelectItem value="1">1x</SelectItem>
-                  <SelectItem value="1.25">1.25x</SelectItem>
-                  <SelectItem value="1.5">1.5x</SelectItem>
-                  <SelectItem value="2">2x</SelectItem>
-                </SelectContent>
-              </Select>
-              
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={toggleFullscreen}
-              >
-                {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
-              </Button>
             </div>
-          </div>
+          )}
 
-          {/* Additional Controls */}
-          <div className="flex justify-center gap-2">
-            <Button size="sm" variant="outline">
-              <Share2 className="h-4 w-4 mr-1" />
-              Share
-            </Button>
-            <Button size="sm" variant="outline">
-              <Download className="h-4 w-4 mr-1" />
-              Download
-            </Button>
-            <Button 
-              size="sm" 
-              variant="outline"
-              onClick={() => setShowSettings(!showSettings)}
-            >
-              <Settings className="h-4 w-4 mr-1" />
-              Settings
-            </Button>
-          </div>
+          {/* Controls Overlay */}
+          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4">
+            {/* Progress Bar */}
+            <div className="mb-4">
+              <Slider
+                value={[duration ? (currentTime / duration) * 100 : 0]}
+                onValueChange={handleSeek}
+                max={100}
+                step={0.1}
+                className="w-full"
+              />
+            </div>
 
-          {/* Settings Panel */}
-          <AnimatePresence>
-            {showSettings && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-                className="space-y-4 p-4 bg-muted/50 rounded-lg"
-              >
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Video Quality</Label>
-                    <Select value={quality} onValueChange={setQuality}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="auto">Auto</SelectItem>
-                        <SelectItem value="1080p">1080p</SelectItem>
-                        <SelectItem value="720p">720p</SelectItem>
-                        <SelectItem value="480p">480p</SelectItem>
-                        <SelectItem value="360p">360p</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+            {/* Control Buttons */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => videoRef.current && (videoRef.current.currentTime -= 10)}
+                  className="text-white hover:bg-white/20"
+                >
+                  <SkipBack className="w-4 h-4" />
+                </Button>
+                
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={togglePlayPause}
+                  className="text-white hover:bg-white/20"
+                >
+                  {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
+                </Button>
+                
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => videoRef.current && (videoRef.current.currentTime += 10)}
+                  className="text-white hover:bg-white/20"
+                >
+                  <SkipForward className="w-4 h-4" />
+                </Button>
+
+                <div className="flex items-center gap-2 text-white">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={toggleMute}
+                    className="text-white hover:bg-white/20"
+                  >
+                    {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                  </Button>
                   
-                  <div className="space-y-2">
-                    <Label>Aspect Ratio</Label>
-                    <Select defaultValue="16:9">
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="16:9">16:9</SelectItem>
-                        <SelectItem value="4:3">4:3</SelectItem>
-                        <SelectItem value="21:9">21:9</SelectItem>
-                      </SelectContent>
-                    </Select>
+                  <div className="w-20">
+                    <Slider
+                      value={[isMuted ? 0 : volume]}
+                      onValueChange={handleVolumeChange}
+                      max={100}
+                      step={1}
+                    />
                   </div>
                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-white text-sm">
+                  {Math.floor(currentTime / 60)}:{(Math.floor(currentTime % 60)).toString().padStart(2, '0')} / {Math.floor(duration / 60)}:{(Math.floor(duration % 60)).toString().padStart(2, '0')}
+                </span>
+                
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={toggleFullscreen}
+                  className="text-white hover:bg-white/20"
+                >
+                  {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
+                </Button>
+              </div>
+            </div>
+          </div>
         </div>
-      </CardContent>
-    </Card>
+      </Card>
+
+      {/* Media Source Tabs */}
+      <Card>
+        <div className="p-6">
+          <Tabs defaultValue="file" className="w-full">
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="file" className="flex items-center gap-2">
+                <Upload className="w-4 h-4" />
+                Local File
+              </TabsTrigger>
+              <TabsTrigger value="url" className="flex items-center gap-2">
+                <LinkIcon className="w-4 h-4" />
+                Direct URL
+              </TabsTrigger>
+              <TabsTrigger value="youtube" className="flex items-center gap-2">
+                <Youtube className="w-4 h-4" />
+                YouTube
+              </TabsTrigger>
+              <TabsTrigger value="settings" className="flex items-center gap-2">
+                <Settings className="w-4 h-4" />
+                Settings
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="file" className="space-y-4">
+              <div className="text-center">
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={(e) => handleFileSelect(e.target.files)}
+                  accept="video/*"
+                  className="hidden"
+                />
+                <Button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full"
+                  disabled={isSeeding}
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  {isSeeding ? 'Sharing File...' : 'Choose Video File'}
+                </Button>
+                {enableP2P && roomCode && (
+                  <p className="text-sm text-muted-foreground mt-2">
+                    P2P sharing enabled - your file will be shared directly with your partner
+                  </p>
+                )}
+              </div>
+              
+              {currentFile && (
+                <div className="text-center space-y-2">
+                  <p className="text-sm text-muted-foreground">
+                    Current: {currentFile.name}
+                  </p>
+                  <div className="flex items-center justify-center gap-2">
+                    <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">
+                      {currentMediaType.toUpperCase()}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="url" className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="direct-url">Video URL (MP4, WebM, HLS)</Label>
+                <Input
+                  id="direct-url"
+                  type="url"
+                  placeholder="https://example.com/video.mp4"
+                  value={directUrl}
+                  onChange={(e) => setDirectUrl(e.target.value)}
+                />
+              </div>
+              <Button onClick={handleDirectUrlLoad} className="w-full" disabled={isLoading}>
+                <LinkIcon className="w-4 h-4 mr-2" />
+                {isLoading ? 'Loading...' : 'Load Video'}
+              </Button>
+            </TabsContent>
+
+            <TabsContent value="youtube" className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="youtube-url">YouTube URL</Label>
+                <Input
+                  id="youtube-url"
+                  type="url"
+                  placeholder="https://www.youtube.com/watch?v=..."
+                  value={youtubeUrl}
+                  onChange={(e) => setYoutubeUrl(e.target.value)}
+                />
+              </div>
+              <Button onClick={handleYouTubeLoad} className="w-full">
+                <Youtube className="w-4 h-4 mr-2" />
+                Load YouTube Video
+              </Button>
+            </TabsContent>
+
+            <TabsContent value="settings" className="space-y-4">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label>P2P File Sharing</Label>
+                    <p className="text-sm text-muted-foreground">Share files directly between browsers</p>
+                  </div>
+                  <Switch
+                    checked={enableP2P}
+                    onCheckedChange={setEnableP2P}
+                  />
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label>Sync Playback</Label>
+                    <p className="text-sm text-muted-foreground">Synchronize play/pause with partner</p>
+                  </div>
+                  <Switch
+                    checked={enableSync}
+                    onCheckedChange={setEnableSync}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Playback Speed</Label>
+                  <Slider
+                    value={[playbackSpeed]}
+                    onValueChange={(value) => {
+                      const speed = value[0];
+                      setPlaybackSpeed(speed);
+                      if (videoRef.current) {
+                        videoRef.current.playbackRate = speed;
+                      }
+                    }}
+                    min={0.25}
+                    max={2}
+                    step={0.25}
+                    className="w-full"
+                  />
+                  <p className="text-sm text-muted-foreground">{playbackSpeed}x speed</p>
+                </div>
+              </div>
+            </TabsContent>
+          </Tabs>
+        </div>
+      </Card>
+    </motion.div>
   );
 };

@@ -7,7 +7,7 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instanciate createClient with right options
+  // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "12.2.12 (cd3cf9e)"
@@ -277,6 +277,35 @@ export type Database = {
           },
         ]
       }
+      room_members: {
+        Row: {
+          id: string
+          joined_at: string
+          room_id: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          joined_at?: string
+          room_id: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          joined_at?: string
+          room_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "room_members_room_fk"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       rooms: {
         Row: {
           created_at: string
@@ -312,6 +341,44 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      rtc_signaling: {
+        Row: {
+          created_at: string
+          id: string
+          payload: Json
+          room_code: string
+          room_id: string
+          sender: string
+          type: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          payload: Json
+          room_code: string
+          room_id: string
+          sender: string
+          type: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          payload?: Json
+          room_code?: string
+          room_id?: string
+          sender?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rtc_signaling_room_fk"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       shared_files: {
         Row: {
@@ -360,6 +427,41 @@ export type Database = {
           uploader_id?: string
         }
         Relationships: []
+      }
+      torrent_links: {
+        Row: {
+          created_at: string
+          created_by: string
+          id: string
+          magnet: string
+          room_code: string
+          room_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          id?: string
+          magnet: string
+          room_code: string
+          room_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          magnet?: string
+          room_code?: string
+          room_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "torrent_links_room_fk"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       users: {
         Row: {

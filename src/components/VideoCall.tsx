@@ -7,9 +7,10 @@ import { Card } from '@/components/ui/card';
 
 interface VideoCallProps {
   roomId: string;
+  roomCode?: string;
 }
 
-export const VideoCall: React.FC<VideoCallProps> = ({ roomId }) => {
+export const VideoCall: React.FC<VideoCallProps> = ({ roomId, roomCode }) => {
   const [isEnabled, setIsEnabled] = useState(false);
   const [isPiP, setIsPiP] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
@@ -26,7 +27,7 @@ export const VideoCall: React.FC<VideoCallProps> = ({ roomId }) => {
     startCall,
     endCall,
     peer
-  } = useWebRTC({ roomId, enabled: isEnabled });
+  } = useWebRTC({ roomId, roomCode, enabled: isEnabled });
 
   const handleToggleCall = async () => {
     if (isConnected || stream) {

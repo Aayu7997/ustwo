@@ -3,14 +3,15 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import SimplePeer from 'simple-peer';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
-import { toast } from '@/components/ui/use-toast';
+import { toast } from '@/hooks/use-toast';
 
 interface WebRTCProps {
   roomId: string;
+  roomCode?: string;
   enabled: boolean;
 }
 
-export const useWebRTC = ({ roomId, enabled }: WebRTCProps) => {
+export const useWebRTC = ({ roomId, roomCode, enabled }: WebRTCProps) => {
   const { user } = useAuth();
   const [peer, setPeer] = useState<SimplePeer.Instance | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -93,17 +94,23 @@ export const useWebRTC = ({ roomId, enabled }: WebRTCProps) => {
       }
     });
 
-    newPeer.on('signal', (data) => {
+    newPeer.on('signal', async (data) => {
       console.log('Sending signal:', data.type, 'from user:', user?.id);
-      channelRef.current?.send({
-        type: 'broadcast',
-        event: 'webrtc_signal',
-        payload: {
-          signal: data,
-          from: user?.id,
-          timestamp: Date.now()
-        }
-      });
+      
+      // Store signal in rtc_signaling table
+      const { error } = await supabase
+        .from('rtc_signaling')
+        .insert({
+          room_id: roomId,
+          room_code: roomCode || '',
+          type: data.type || 'candidate',
+          payload: data,
+          sender: user?.id
+        });
+      
+      if (error) {
+        console.error('Failed to store RTC signal:', error);
+      }
     });
 
     newPeer.on('stream', (remoteStream) => {
@@ -213,18 +220,24 @@ export const useWebRTC = ({ roomId, enabled }: WebRTCProps) => {
 
     console.log('Setting up WebRTC signaling for room:', roomId);
 
-    // Subscribe to WebRTC signaling channel
-    const channel = supabase.channel(`webrtc_${roomId}`)
-      .on('broadcast', { event: 'webrtc_signal' }, (payload) => {
-        const { signal, from } = payload.payload;
+    // Subscribe to rtc_signaling table changes
+    const channel = supabase.channel(`rtc_signaling_${roomId}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'rtc_signaling',
+        filter: `room_id=eq.${roomId}`
+      }, (payload) => {
+        const signalData = payload.new;
         
         // Ignore our own signals
-        if (from === user.id) {
+        if (signalData.sender === user.id) {
           console.log('Ignoring own signal');
           return;
         }
 
-        console.log('Received signal:', signal.type, 'from:', from);
+        console.log('Received signal:', signalData.type, 'from:', signalData.sender);
+        const signal = signalData.payload;
         
         if (signal.type === 'offer' && !peer) {
           console.log('Receiving call offer');
@@ -232,19 +245,19 @@ export const useWebRTC = ({ roomId, enabled }: WebRTCProps) => {
         } else if (peer && signal.type === 'answer') {
           console.log('Receiving call answer');
           peer.signal(signal);
-        } else if (peer && signal.candidate) {
+        } else if (peer && (signal.candidate || signalData.type === 'candidate')) {
           console.log('Receiving ICE candidate');
           peer.signal(signal);
         }
       })
       .subscribe((status) => {
-        console.log('WebRTC channel status:', status);
+        console.log('RTC signaling channel status:', status);
       });
 
     channelRef.current = channel;
 
     return () => {
-      console.log('Cleaning up WebRTC channel');
+      console.log('Cleaning up RTC signaling channel');
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
       }

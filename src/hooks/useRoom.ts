@@ -120,35 +120,20 @@ export const useRoom = (roomId?: string) => {
     try {
       console.log('Searching for room with code:', trimmedCode);
       
-      // First try exact match (case-sensitive)
-      let { data: roomData, error: roomError } = await supabase
+      // Query room by code
+      const { data: roomData, error: roomError } = await supabase
         .from('rooms')
         .select('*')
         .eq('room_code', trimmedCode)
         .maybeSingle();
 
-      // If no exact match, try case-insensitive search
-      if (!roomData && !roomError) {
-        console.log('Exact match not found, trying case-insensitive search...');
-        const { data: fallbackData, error: fallbackError } = await supabase
-          .from('rooms')
-          .select('*')
-          .ilike('room_code', trimmedCode)
-          .limit(1)
-          .maybeSingle();
-
-        if (fallbackError && fallbackError.code !== 'PGRST116') {
-          throw fallbackError;
-        }
-        roomData = fallbackData;
-      }
-
-      if (roomError && roomError.code !== 'PGRST116') {
+      if (roomError) {
+        console.error('Room query error:', roomError);
         throw roomError;
       }
 
       if (!roomData) {
-        throw new Error(`Room not found with code "${trimmedCode}". Please check the code and try again.`);
+        throw new Error(`Room code "${trimmedCode}" not found. Please check the code and try again.`);
       }
 
       console.log('Found room:', roomData);
@@ -163,8 +148,15 @@ export const useRoom = (roomId?: string) => {
         return roomData;
       }
 
-      // Check if user is already the partner
-      if (roomData.partner_id === user.id) {
+      // Check if user is already a member
+      const { data: existingMember } = await supabase
+        .from('room_members')
+        .select('*')
+        .eq('room_id', roomData.id)
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (existingMember) {
         setRoom(roomData);
         toast({
           title: "Welcome Back! 💕",
@@ -173,31 +165,40 @@ export const useRoom = (roomId?: string) => {
         return roomData;
       }
 
-      // Check if room already has a partner
-      if (roomData.partner_id) {
-        throw new Error('This room is already full. Only two people can be in a room at once.');
+      // Add user to room_members table
+      const { error: memberError } = await supabase
+        .from('room_members')
+        .insert({
+          room_id: roomData.id,
+          user_id: user.id
+        });
+
+      if (memberError) {
+        console.error('Room member insert error:', memberError);
+        throw memberError;
       }
 
-      // Join the room as partner
-      const { data: updatedRoom, error: updateError } = await supabase
-        .from('rooms')
-        .update({ partner_id: user.id })
-        .eq('id', roomData.id)
-        .select()
-        .single();
+      // Update partner_id if room doesn't have one yet
+      if (!roomData.partner_id) {
+        const { error: updateError } = await supabase
+          .from('rooms')
+          .update({ partner_id: user.id })
+          .eq('id', roomData.id);
 
-      if (updateError) {
-        console.error('Room update error:', updateError);
-        throw updateError;
+        if (updateError) {
+          console.error('Room update error:', updateError);
+        }
+        
+        roomData.partner_id = user.id;
       }
 
-      setRoom(updatedRoom);
+      setRoom(roomData);
       toast({
         title: "Joined Room! 💕",
-        description: `Welcome to "${updatedRoom.name}"! You can now start watching together.`
+        description: `Welcome to "${roomData.name}"! You can now start watching together.`
       });
       
-      return updatedRoom;
+      return roomData;
 
     } catch (error: any) {
       console.error('Join room failed:', error);
