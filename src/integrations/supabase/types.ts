@@ -14,6 +14,41 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_recommendations: {
+        Row: {
+          created_at: string | null
+          id: string
+          partner_id: string
+          recommendations: Json
+          room_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          partner_id: string
+          recommendations: Json
+          room_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          partner_id?: string
+          recommendations?: Json
+          room_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_recommendations_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       calendar_events: {
         Row: {
           created_at: string
@@ -277,6 +312,42 @@ export type Database = {
           },
         ]
       }
+      preferences: {
+        Row: {
+          actors: string[] | null
+          created_at: string | null
+          directors: string[] | null
+          disliked: string[] | null
+          genres: string[] | null
+          id: string
+          platforms: string[] | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          actors?: string[] | null
+          created_at?: string | null
+          directors?: string[] | null
+          disliked?: string[] | null
+          genres?: string[] | null
+          id?: string
+          platforms?: string[] | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          actors?: string[] | null
+          created_at?: string | null
+          directors?: string[] | null
+          disliked?: string[] | null
+          genres?: string[] | null
+          id?: string
+          platforms?: string[] | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       room_members: {
         Row: {
           id: string
@@ -373,6 +444,38 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "rtc_signaling_room_fk"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      saved_recommendations: {
+        Row: {
+          created_at: string | null
+          id: string
+          recommendation_data: Json
+          room_id: string
+          saved_by: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          recommendation_data: Json
+          room_id: string
+          saved_by: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          recommendation_data?: Json
+          room_id?: string
+          saved_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_recommendations_room_id_fkey"
             columns: ["room_id"]
             isOneToOne: false
             referencedRelation: "rooms"

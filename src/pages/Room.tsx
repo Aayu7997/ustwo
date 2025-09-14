@@ -11,9 +11,11 @@ import { ExtensionBridge } from '@/components/ExtensionBridge';
 import { RoomControls } from '@/components/RoomControls';
 import { VideoCall } from '@/components/VideoCall';
 import { PartnerPresence } from '@/components/PartnerPresence';
+import { AIRecommendations } from '@/components/AIRecommendations';
+import { PreferencesSetup } from '@/components/PreferencesSetup';
 
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Heart } from 'lucide-react';
+import { ArrowLeft, Heart, Settings, Sparkles } from 'lucide-react';
 
 const Room: React.FC = () => {
   const { roomId } = useParams<{ roomId: string }>();
@@ -24,6 +26,8 @@ const Room: React.FC = () => {
   const [heartTrigger, setHeartTrigger] = useState(false);
   const [playbackState, setPlaybackState] = useState({ isPlaying: false, currentTime: 0 });
   const [chatMinimized, setChatMinimized] = useState(false);
+  const [showPreferences, setShowPreferences] = useState(false);
+  const [showAIRecommendations, setShowAIRecommendations] = useState(false);
 
   useEffect(() => {
     if (roomId && !authLoading && user) {
@@ -143,12 +147,28 @@ const Room: React.FC = () => {
           </motion.div>
         )}
 
+        {/* AI Recommendations */}
+        {roomId && showAIRecommendations && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5 }}
+            className="max-w-6xl mx-auto"
+          >
+            <AIRecommendations 
+              roomId={roomId}
+              roomCode={currentRoom?.room_code || ''}
+              partnerId={currentRoom?.partner_id || undefined}
+            />
+          </motion.div>
+        )}
+
         {/* Extension Bridge for OTT Sync */}
         {roomId && currentRoom && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
+            transition={{ delay: 0.6 }}
           >
             <ExtensionBridge 
               roomId={roomId} 
@@ -175,6 +195,27 @@ const Room: React.FC = () => {
           partnerJoined={!!currentRoom?.partner_id}
           onSyncEvent={(event) => console.log('Sync event:', event)}
         />
+      )}
+      
+      {/* Preferences Setup Modal */}
+      {showPreferences && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-background rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold">Setup Your Preferences</h2>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowPreferences(false)}
+                >
+                  ✕
+                </Button>
+              </div>
+              <PreferencesSetup onClose={() => setShowPreferences(false)} />
+            </div>
+          </div>
+        </div>
       )}
       
       {/* Floating Hearts */}
