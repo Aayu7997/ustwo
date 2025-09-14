@@ -3,15 +3,36 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { toast } from '@/hooks/use-toast';
 
-// Import WebTorrent dynamically to avoid SSR issues
+// Load WebTorrent from CDN at runtime to avoid bundling Node shims
+declare global {
+  interface Window {
+    WebTorrent?: any;
+  }
+}
+
 let WebTorrent: any = null;
 
 const initWebTorrent = async () => {
-  if (typeof window !== 'undefined' && !WebTorrent) {
-    const module = await import('webtorrent');
-    WebTorrent = module.default;
+  if (typeof window === 'undefined') return null;
+  if (WebTorrent) return WebTorrent;
+  if (window.WebTorrent) {
+    WebTorrent = window.WebTorrent;
+    return WebTorrent;
   }
-  return WebTorrent;
+  return new Promise<any>((resolve) => {
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/webtorrent@2.8.4/webtorrent.min.js';
+    script.async = true;
+    script.onload = () => {
+      WebTorrent = window.WebTorrent;
+      resolve(WebTorrent);
+    };
+    script.onerror = () => {
+      console.error('Failed to load WebTorrent from CDN');
+      resolve(null);
+    };
+    document.head.appendChild(script);
+  });
 };
 
 interface TorrentData {
