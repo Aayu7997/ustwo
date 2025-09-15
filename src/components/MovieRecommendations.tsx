@@ -23,12 +23,19 @@ const MOODS = [
   'Emotional', 'Light-hearted', 'Intense', 'Surprise Me!'
 ];
 
-export const MovieRecommendations: React.FC = () => {
+export interface MovieRecommendationsProps {
+  roomId?: string;
+  partnerId?: string;
+}
+
+export const MovieRecommendations: React.FC<MovieRecommendationsProps> = ({ roomId, partnerId }) => {
   const { recommendations, loading, getRecommendations, surpriseMe } = useRecommendations();
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
   const [watchHistory, setWatchHistory] = useState('');
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
   const [mood, setMood] = useState<string>('');
+
+  const canRequest = Boolean(roomId && partnerId);
 
   const handleGenreChange = (genre: string, checked: boolean) => {
     setSelectedGenres(prev => 
@@ -46,13 +53,18 @@ export const MovieRecommendations: React.FC = () => {
     );
   };
 
-  const handleGetRecommendations = () => {
-    getRecommendations({
+const handleGetRecommendations = () => {
+  if (!canRequest) return;
+  getRecommendations(
+    {
       genres: selectedGenres,
       watchHistory: watchHistory.split(',').map(s => s.trim()).filter(Boolean),
-      preferredPlatforms: selectedPlatforms
-    }, mood);
-  };
+      preferredPlatforms: selectedPlatforms,
+    },
+    mood,
+    { roomId: roomId!, partnerId: partnerId! }
+  );
+};
 
   return (
     <div className="space-y-6">
@@ -124,24 +136,24 @@ export const MovieRecommendations: React.FC = () => {
             </Select>
           </div>
 
-          <div className="flex gap-3">
-            <Button 
-              onClick={handleGetRecommendations}
-              disabled={loading}
-              className="flex-1"
-            >
-              {loading ? 'Finding Magic...' : 'Get Recommendations'}
-            </Button>
-            <Button 
-              onClick={surpriseMe}
-              disabled={loading}
-              variant="outline"
-              className="flex items-center gap-2"
-            >
-              <Sparkles className="h-4 w-4" />
-              Surprise Me!
-            </Button>
-          </div>
+<div className="flex gap-3">
+  <Button 
+    onClick={handleGetRecommendations}
+    disabled={loading || !canRequest}
+    className="flex-1"
+  >
+    {loading ? 'Finding Magic...' : 'Get Recommendations'}
+  </Button>
+  <Button 
+    onClick={() => canRequest && surpriseMe({ roomId: roomId!, partnerId: partnerId! })}
+    disabled={loading || !canRequest}
+    variant="outline"
+    className="flex items-center gap-2"
+  >
+    <Sparkles className="h-4 w-4" />
+    Surprise Me!
+  </Button>
+</div>
         </CardContent>
       </Card>
 

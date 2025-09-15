@@ -190,9 +190,9 @@ const Index = () => {
                 <LoveMeter partnerId={currentRoom?.partner_id} />
               </TabsContent>
 
-              <TabsContent value="recommendations">
-                <MovieRecommendations />
-              </TabsContent>
+<TabsContent value="recommendations">
+  <MovieRecommendations roomId={currentRoom?.id} partnerId={currentRoom?.partner_id} />
+</TabsContent>
 
               <TabsContent value="themes">
                 <ThemeSelector />
