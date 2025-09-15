@@ -109,7 +109,7 @@ export const useRoom = (roomId?: string) => {
     const trimmedCode = roomCode.trim().toUpperCase();
     if (!trimmedCode) {
       toast({
-        title: "Error",
+        title: "Error", 
         description: "Please enter a valid room code",
         variant: "destructive"
       });
@@ -118,85 +118,42 @@ export const useRoom = (roomId?: string) => {
 
     setLoading(true);
     try {
-      console.log('Searching for room with code:', trimmedCode);
+      console.log('Joining room with code:', trimmedCode);
       
-      // Query room by code
+      // Use the secure RPC function
       const { data: roomData, error: roomError } = await supabase
-        .from('rooms')
-        .select('*')
-        .eq('room_code', trimmedCode)
-        .maybeSingle();
+        .rpc('join_room_by_code', { p_code: trimmedCode });
 
       if (roomError) {
-        console.error('Room query error:', roomError);
-        throw roomError;
+        console.error('Room join error:', roomError);
+        if (roomError.message?.includes('room_not_found')) {
+          throw new Error(`Room code "${trimmedCode}" not found. Please check the code and try again.`);
+        } else if (roomError.message?.includes('not_authenticated')) {
+          throw new Error('Authentication required. Please sign in and try again.');
+        } else {
+          throw roomError;
+        }
       }
 
       if (!roomData) {
         throw new Error(`Room code "${trimmedCode}" not found. Please check the code and try again.`);
       }
 
-      console.log('Found room:', roomData);
+      console.log('Successfully joined room:', roomData);
 
-      // Check if user is already the creator
+      setRoom(roomData);
+      
       if (roomData.creator_id === user.id) {
-        setRoom(roomData);
         toast({
           title: "Welcome Back! 💕",
           description: `You're the creator of "${roomData.name}"`
         });
-        return roomData;
-      }
-
-      // Check if user is already a member
-      const { data: existingMember } = await supabase
-        .from('room_members')
-        .select('*')
-        .eq('room_id', roomData.id)
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (existingMember) {
-        setRoom(roomData);
+      } else {
         toast({
-          title: "Welcome Back! 💕",
-          description: `You're already in "${roomData.name}"`
+          title: "Joined Room! 💕", 
+          description: `Welcome to "${roomData.name}"! You can now start watching together.`
         });
-        return roomData;
       }
-
-      // Add user to room_members table
-      const { error: memberError } = await supabase
-        .from('room_members')
-        .insert({
-          room_id: roomData.id,
-          user_id: user.id
-        });
-
-      if (memberError) {
-        console.error('Room member insert error:', memberError);
-        throw memberError;
-      }
-
-      // Update partner_id if room doesn't have one yet
-      if (!roomData.partner_id) {
-        const { error: updateError } = await supabase
-          .from('rooms')
-          .update({ partner_id: user.id })
-          .eq('id', roomData.id);
-
-        if (updateError) {
-          console.error('Room update error:', updateError);
-        }
-        
-        roomData.partner_id = user.id;
-      }
-
-      setRoom(roomData);
-      toast({
-        title: "Joined Room! 💕",
-        description: `Welcome to "${roomData.name}"! You can now start watching together.`
-      });
       
       return roomData;
 

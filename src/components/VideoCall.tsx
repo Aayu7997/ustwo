@@ -34,8 +34,13 @@ export const VideoCall: React.FC<VideoCallProps> = ({ roomId, roomCode }) => {
       endCall();
       setIsEnabled(false);
     } else {
-      setIsEnabled(true);
-      await startCall();
+      try {
+        setIsEnabled(true);
+        await startCall();
+      } catch (error) {
+        console.error('Failed to start call:', error);
+        setIsEnabled(false);
+      }
     }
   };
 
@@ -94,10 +99,20 @@ export const VideoCall: React.FC<VideoCallProps> = ({ roomId, roomCode }) => {
       >
         <Button
           onClick={handleToggleCall}
-          className="w-full flex items-center gap-2 bg-gradient-to-r from-love-pink to-love-purple hover:from-love-red hover:to-love-pink transition-all duration-300"
+          disabled={isEnabled && !stream}
+          className="w-full flex items-center gap-2 bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90 text-white transition-all duration-300 disabled:opacity-50"
         >
-          <Video className="w-4 h-4" />
-          Start Video Call
+          {isEnabled && !stream ? (
+            <>
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              Requesting Permissions...
+            </>
+          ) : (
+            <>
+              <Video className="w-4 h-4" />
+              Start Video Call
+            </>
+          )}
         </Button>
       </motion.div>
     );

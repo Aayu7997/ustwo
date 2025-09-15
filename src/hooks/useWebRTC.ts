@@ -24,48 +24,79 @@ export const useWebRTC = ({ roomId, roomCode, enabled }: WebRTCProps) => {
 
   const initializeMedia = useCallback(async () => {
     try {
-      console.log('Initializing media stream...');
+      console.log('Requesting media permissions...');
+      
+      // Request permissions first
+      const permissions = await Promise.all([
+        navigator.permissions.query({ name: 'camera' as PermissionName }),
+        navigator.permissions.query({ name: 'microphone' as PermissionName })
+      ]);
+      
+      console.log('Permissions status:', permissions.map(p => p.state));
+      
+      // Check if we need to request permissions
+      if (permissions.some(p => p.state === 'denied')) {
+        throw new Error('NotAllowedError');
+      }
+      
+      console.log('Getting user media stream...');
       const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { 
+        video: {
           width: { ideal: 1280, max: 1920 },
           height: { ideal: 720, max: 1080 },
           facingMode: 'user',
-          frameRate: { ideal: 30 }
+          frameRate: { ideal: 30, min: 15 }
         },
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
-          sampleRate: 44100
+          sampleRate: { ideal: 44100, min: 16000 }
         }
       });
       
-      console.log('Media stream obtained:', mediaStream.getTracks().length, 'tracks');
+      console.log('Media stream obtained successfully:', {
+        videoTracks: mediaStream.getVideoTracks().length,
+        audioTracks: mediaStream.getAudioTracks().length,
+        id: mediaStream.id
+      });
+      
       setStream(mediaStream);
       
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = mediaStream;
         localVideoRef.current.muted = true;
+        localVideoRef.current.playsInline = true;
+        localVideoRef.current.autoplay = true;
       }
       
       return mediaStream;
     } catch (error) {
-      console.error('Failed to get media:', error);
+      console.error('Media initialization failed:', error);
       let errorMessage = "Failed to access camera/microphone";
+      let userActions = "";
       
       if (error instanceof Error) {
-        if (error.name === 'NotAllowedError') {
-          errorMessage = "Camera/microphone access denied. Please allow permissions and refresh.";
+        console.log('Error details:', { name: error.name, message: error.message });
+        
+        if (error.name === 'NotAllowedError' || error.message.includes('NotAllowedError')) {
+          errorMessage = "Camera/microphone access denied";
+          userActions = "Please click 'Allow' when prompted and refresh the page.";
         } else if (error.name === 'NotFoundError') {
-          errorMessage = "No camera/microphone found.";
+          errorMessage = "No camera/microphone found";
+          userActions = "Please connect a camera/microphone and try again.";
         } else if (error.name === 'NotReadableError') {
-          errorMessage = "Camera/microphone is already in use.";
+          errorMessage = "Camera/microphone is already in use";
+          userActions = "Please close other applications using your camera/microphone.";
+        } else if (error.name === 'OverconstrainedError') {
+          errorMessage = "Camera/microphone constraints not supported";
+          userActions = "Your device doesn't support the required video/audio quality.";
         }
       }
       
       toast({
         title: "Media Access Error",
-        description: errorMessage,
+        description: `${errorMessage}. ${userActions}`,
         variant: "destructive"
       });
       throw error;

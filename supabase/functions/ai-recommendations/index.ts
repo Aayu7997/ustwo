@@ -32,10 +32,32 @@ serve(async (req) => {
     const openRouterApiKey = Deno.env.get('OPENROUTER_API_KEY')
     
     if (!openRouterApiKey) {
-      throw new Error('OpenRouter API key not configured')
+      console.error('OpenRouter API key not found')
+      return new Response(
+        JSON.stringify({ 
+          error: 'OpenRouter API key not configured. Please add OPENROUTER_API_KEY secret.' 
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      )
     }
 
-    const { userPreferences, partnerPreferences, roomId, partnerId } = await req.json() as RecommendationRequest
+    const requestBody = await req.json() as RecommendationRequest
+    const { userPreferences, partnerPreferences, roomId, partnerId } = requestBody
+
+    // Validate required fields
+    if (!roomId) {
+      console.error('Missing roomId in request')
+      return new Response(
+        JSON.stringify({ error: 'Room ID is required' }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      )
+    }
 
     console.log('Generating AI recommendations for room:', roomId)
 
@@ -81,7 +103,7 @@ Focus on finding the perfect balance between both users' preferences. If they ha
         'X-Title': 'UsTwo'
       },
       body: JSON.stringify({
-        model: 'openrouter/sonoma-sky-alpha',
+        model: 'anthropic/claude-3.5-sonnet',
         messages: [
           {
             role: 'system',

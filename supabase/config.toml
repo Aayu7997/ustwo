@@ -1,4 +1,7 @@
 project_id = "mxatgocmnasozbkbjiuq"
 
+[functions.ai-recommendations]
+verify_jwt = true
+
 [functions.drive-proxy]
 verify_jwt = false
