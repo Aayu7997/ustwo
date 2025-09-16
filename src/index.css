@@ -66,6 +66,12 @@ All colors MUST be HSL.
     --love-red: 348 83% 47%;
     --love-purple: 300 47% 60%;
     --heart-glow: 0 0 20px hsl(330 81% 60% / 0.6);
+    
+    /* Video call specific */
+    --video-bg: 220 13% 18%;
+    --video-control: 220 13% 25%;
+    --video-active: 142 76% 36%;
+    --video-inactive: 0 84% 60%;
   }
 
   .dark {

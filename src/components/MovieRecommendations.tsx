@@ -136,23 +136,40 @@ const handleGetRecommendations = () => {
             </Select>
           </div>
 
-<div className="flex gap-3">
-  <Button 
-    onClick={handleGetRecommendations}
-    disabled={loading || !canRequest}
-    className="flex-1"
-  >
-    {loading ? 'Finding Magic...' : 'Get Recommendations'}
-  </Button>
-  <Button 
-    onClick={() => canRequest && surpriseMe({ roomId: roomId!, partnerId: partnerId! })}
-    disabled={loading || !canRequest}
-    variant="outline"
-    className="flex items-center gap-2"
-  >
-    <Sparkles className="h-4 w-4" />
-    Surprise Me!
-  </Button>
+<div className="space-y-3">
+  {!canRequest && (
+    <div className="text-center p-4 bg-muted/50 rounded-lg">
+      <p className="text-sm text-muted-foreground">
+        💕 You need to be in a room with your partner to get AI recommendations
+      </p>
+    </div>
+  )}
+  
+  <div className="flex gap-3">
+    <Button 
+      onClick={handleGetRecommendations}
+      disabled={loading || !canRequest}
+      className="flex-1 bg-gradient-to-r from-love-pink to-love-purple hover:from-love-pink/90 hover:to-love-purple/90 text-white shadow-lg transition-all duration-300"
+    >
+      {loading ? (
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+          Finding Magic...
+        </div>
+      ) : (
+        'Get AI Recommendations'
+      )}
+    </Button>
+    <Button 
+      onClick={() => canRequest && surpriseMe({ roomId: roomId!, partnerId: partnerId! })}
+      disabled={loading || !canRequest}
+      variant="outline"
+      className="flex items-center gap-2 border-love-pink text-love-pink hover:bg-love-pink hover:text-white transition-all duration-300"
+    >
+      <Sparkles className="h-4 w-4" />
+      Surprise Me!
+    </Button>
+  </div>
 </div>
         </CardContent>
       </Card>

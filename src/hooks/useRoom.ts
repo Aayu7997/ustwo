@@ -116,31 +116,69 @@ export const useRoom = (roomId?: string) => {
       return null;
     }
 
+    if (trimmedCode.length !== 6) {
+      toast({
+        title: "Invalid Room Code",
+        description: "Room codes must be exactly 6 characters",
+        variant: "destructive"
+      });
+      return null;
+    }
+
     setLoading(true);
     try {
       console.log('Joining room with code:', trimmedCode);
       
-      // Use the secure RPC function
+      // First try to find the room directly
       const { data: roomData, error: roomError } = await supabase
-        .rpc('join_room_by_code', { p_code: trimmedCode });
+        .from('rooms')
+        .select('*')
+        .eq('room_code', trimmedCode)
+        .single();
 
       if (roomError) {
-        console.error('Room join error:', roomError);
-        if (roomError.message?.includes('room_not_found')) {
+        console.error('Room query error:', roomError);
+        if (roomError.code === 'PGRST116') {
           throw new Error(`Room code "${trimmedCode}" not found. Please check the code and try again.`);
-        } else if (roomError.message?.includes('not_authenticated')) {
-          throw new Error('Authentication required. Please sign in and try again.');
-        } else {
-          throw roomError;
         }
+        throw roomError;
       }
 
       if (!roomData) {
         throw new Error(`Room code "${trimmedCode}" not found. Please check the code and try again.`);
       }
 
-      console.log('Successfully joined room:', roomData);
+      // If partner slot is empty and user is not the creator, set as partner
+      if (roomData.partner_id === null && roomData.creator_id !== user.id) {
+        const { data: updatedRoom, error: updateError } = await supabase
+          .from('rooms')
+          .update({ partner_id: user.id })
+          .eq('id', roomData.id)
+          .select()
+          .single();
 
+        if (updateError) {
+          console.error('Failed to set partner:', updateError);
+        } else {
+          roomData.partner_id = user.id;
+        }
+      }
+
+      // Ensure user is in room_members
+      const { error: memberError } = await supabase
+        .from('room_members')
+        .upsert({
+          room_id: roomData.id,
+          user_id: user.id
+        }, {
+          onConflict: 'room_id,user_id'
+        });
+
+      if (memberError) {
+        console.error('Failed to add to room_members:', memberError);
+      }
+
+      console.log('Successfully joined room:', roomData);
       setRoom(roomData);
       
       if (roomData.creator_id === user.id) {
@@ -162,10 +200,10 @@ export const useRoom = (roomId?: string) => {
       
       // Provide helpful error messages
       let errorMessage = error.message;
-      if (error.message?.includes('not found')) {
-        errorMessage = `Room code "${trimmedCode}" not found. Please check the code and try again.`;
-      } else if (error.message?.includes('full')) {
-        errorMessage = 'This room is already full. Ask the room creator for a new room.';
+      if (error.message?.includes('not found') || error.code === 'PGRST116') {
+        errorMessage = `Room code "${trimmedCode}" not found. Please double-check the code and try again.`;
+      } else if (error.message?.includes('duplicate')) {
+        errorMessage = 'You are already in this room!';
       } else if (error.message?.includes('network') || error.message?.includes('fetch')) {
         errorMessage = 'Connection error. Please check your internet and try again.';
       }

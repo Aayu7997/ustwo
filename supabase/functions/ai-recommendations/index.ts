@@ -103,7 +103,7 @@ Focus on finding the perfect balance between both users' preferences. If they ha
         'X-Title': 'UsTwo'
       },
       body: JSON.stringify({
-        model: 'anthropic/claude-3.5-sonnet',
+        model: 'anthropic/claude-3.5-sonnet-20241022',
         messages: [
           {
             role: 'system',

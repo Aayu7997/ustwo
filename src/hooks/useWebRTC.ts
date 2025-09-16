@@ -26,34 +26,46 @@ export const useWebRTC = ({ roomId, roomCode, enabled }: WebRTCProps) => {
     try {
       console.log('Requesting media permissions...');
       
-      // Request permissions first
-      const permissions = await Promise.all([
-        navigator.permissions.query({ name: 'camera' as PermissionName }),
-        navigator.permissions.query({ name: 'microphone' as PermissionName })
-      ]);
-      
-      console.log('Permissions status:', permissions.map(p => p.state));
-      
-      // Check if we need to request permissions
-      if (permissions.some(p => p.state === 'denied')) {
-        throw new Error('NotAllowedError');
+      // First check if getUserMedia is available
+      if (!navigator.mediaDevices?.getUserMedia) {
+        throw new Error('getUserMedia not supported on this browser');
       }
       
-      console.log('Getting user media stream...');
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          width: { ideal: 1280, max: 1920 },
-          height: { ideal: 720, max: 1080 },
-          facingMode: 'user',
-          frameRate: { ideal: 30, min: 15 }
-        },
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-          sampleRate: { ideal: 44100, min: 16000 }
-        }
-      });
+      // Try to get media with fallback constraints
+      let mediaStream: MediaStream;
+      
+      try {
+        // Try with high quality first
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            width: { ideal: 1280, max: 1920 },
+            height: { ideal: 720, max: 1080 },
+            facingMode: 'user',
+            frameRate: { ideal: 30, min: 15 }
+          },
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+            sampleRate: { ideal: 44100, min: 16000 }
+          }
+        });
+      } catch (highQualityError) {
+        console.log('High quality failed, trying basic constraints:', highQualityError);
+        
+        // Fallback to basic constraints
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            width: { ideal: 640, max: 1280 },
+            height: { ideal: 480, max: 720 },
+            facingMode: 'user'
+          },
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true
+          }
+        });
+      }
       
       console.log('Media stream obtained successfully:', {
         videoTracks: mediaStream.getVideoTracks().length,
@@ -63,12 +75,50 @@ export const useWebRTC = ({ roomId, roomCode, enabled }: WebRTCProps) => {
       
       setStream(mediaStream);
       
+      // Set up local video with better error handling
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = mediaStream;
         localVideoRef.current.muted = true;
         localVideoRef.current.playsInline = true;
         localVideoRef.current.autoplay = true;
+        
+        // Wait for video to be ready
+        await new Promise((resolve, reject) => {
+          const video = localVideoRef.current;
+          if (!video) {
+            reject(new Error('Video element not found'));
+            return;
+          }
+          
+          const onLoad = () => {
+            video.removeEventListener('loadedmetadata', onLoad);
+            video.removeEventListener('error', onError);
+            resolve(true);
+          };
+          
+          const onError = (e: any) => {
+            video.removeEventListener('loadedmetadata', onLoad);
+            video.removeEventListener('error', onError);
+            console.error('Video element error:', e);
+            reject(e);
+          };
+          
+          video.addEventListener('loadedmetadata', onLoad);
+          video.addEventListener('error', onError);
+          
+          // Timeout after 5 seconds
+          setTimeout(() => {
+            video.removeEventListener('loadedmetadata', onLoad);
+            video.removeEventListener('error', onError);
+            resolve(true); // Continue even if video doesn't load
+          }, 5000);
+        });
       }
+      
+      toast({
+        title: "Camera & Microphone Ready! 📹",
+        description: "You can now start your video call"
+      });
       
       return mediaStream;
     } catch (error) {
@@ -79,9 +129,9 @@ export const useWebRTC = ({ roomId, roomCode, enabled }: WebRTCProps) => {
       if (error instanceof Error) {
         console.log('Error details:', { name: error.name, message: error.message });
         
-        if (error.name === 'NotAllowedError' || error.message.includes('NotAllowedError')) {
+        if (error.name === 'NotAllowedError' || error.message.includes('Permission denied')) {
           errorMessage = "Camera/microphone access denied";
-          userActions = "Please click 'Allow' when prompted and refresh the page.";
+          userActions = "Please click 'Allow' when prompted for camera and microphone permissions.";
         } else if (error.name === 'NotFoundError') {
           errorMessage = "No camera/microphone found";
           userActions = "Please connect a camera/microphone and try again.";
@@ -91,11 +141,14 @@ export const useWebRTC = ({ roomId, roomCode, enabled }: WebRTCProps) => {
         } else if (error.name === 'OverconstrainedError') {
           errorMessage = "Camera/microphone constraints not supported";
           userActions = "Your device doesn't support the required video/audio quality.";
+        } else if (error.message.includes('getUserMedia not supported')) {
+          errorMessage = "Video calls not supported on this browser";
+          userActions = "Please try using Chrome, Firefox, or Safari.";
         }
       }
       
       toast({
-        title: "Media Access Error",
+        title: "Media Access Issue 📱",
         description: `${errorMessage}. ${userActions}`,
         variant: "destructive"
       });

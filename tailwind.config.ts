@@ -75,6 +75,13 @@ export default {
 					pink: 'hsl(var(--love-pink))',
 					red: 'hsl(var(--love-red))',
 					purple: 'hsl(var(--love-purple))'
+				},
+				// Video call colors
+				video: {
+					bg: 'hsl(var(--video-bg))',
+					control: 'hsl(var(--video-control))',
+					active: 'hsl(var(--video-active))',
+					inactive: 'hsl(var(--video-inactive))'
 				}
 			},
 			borderRadius: {

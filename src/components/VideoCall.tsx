@@ -97,23 +97,38 @@ export const VideoCall: React.FC<VideoCallProps> = ({ roomId, roomCode }) => {
         animate={{ opacity: 1, scale: 1 }}
         className="mb-4"
       >
-        <Button
-          onClick={handleToggleCall}
-          disabled={isEnabled && !stream}
-          className="w-full flex items-center gap-2 bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90 text-white transition-all duration-300 disabled:opacity-50"
-        >
-          {isEnabled && !stream ? (
-            <>
-              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              Requesting Permissions...
-            </>
-          ) : (
-            <>
-              <Video className="w-4 h-4" />
-              Start Video Call
-            </>
-          )}
-        </Button>
+        <div className="space-y-3 text-center">
+          <div className="p-4 bg-gradient-to-r from-love-pink/10 to-love-purple/10 rounded-lg border border-love-pink/20">
+            <Video className="w-8 h-8 mx-auto mb-2 text-love-pink" />
+            <h3 className="font-semibold text-love-pink mb-1">Video Call Ready</h3>
+            <p className="text-sm text-muted-foreground">
+              Connect face-to-face while watching together
+            </p>
+          </div>
+          
+          <Button
+            onClick={handleToggleCall}
+            disabled={isEnabled && !stream}
+            className="w-full flex items-center gap-2 bg-gradient-to-r from-love-pink to-love-purple hover:from-love-pink/90 hover:to-love-purple/90 text-white transition-all duration-300 disabled:opacity-50 shadow-lg"
+            size="lg"
+          >
+            {isEnabled && !stream ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Getting Camera Ready...
+              </>
+            ) : (
+              <>
+                <Video className="w-5 h-5" />
+                Start Video Call
+              </>
+            )}
+          </Button>
+          
+          <p className="text-xs text-muted-foreground">
+            📹 Allow camera & microphone access when prompted
+          </p>
+        </div>
       </motion.div>
     );
   }
@@ -166,12 +181,21 @@ export const VideoCall: React.FC<VideoCallProps> = ({ roomId, roomCode }) => {
 
               {/* Connection status */}
               {!remoteStream && isEnabled && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-                  <div className="text-center text-white">
-                    <div className="w-8 h-8 border-2 border-love-pink border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-                    <p className="text-sm">
-                      {isInitiator ? 'Calling your partner...' : 'Connecting...'}
-                    </p>
+                <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-video-bg/95 to-black/90 backdrop-blur-sm">
+                  <div className="text-center text-white space-y-3">
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                      className="w-12 h-12 border-3 border-love-pink border-t-transparent rounded-full mx-auto"
+                    />
+                    <div>
+                      <p className="text-lg font-medium">
+                        {isInitiator ? '📞 Calling your partner...' : '🔗 Connecting...'}
+                      </p>
+                      <p className="text-sm text-white/70 mt-1">
+                        {isInitiator ? 'Waiting for them to answer' : 'Establishing connection'}
+                      </p>
+                    </div>
                   </div>
                 </div>
               )}
@@ -193,54 +217,62 @@ export const VideoCall: React.FC<VideoCallProps> = ({ roomId, roomCode }) => {
               </div>
 
               {/* Controls */}
-              <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between bg-black/50 backdrop-blur-sm rounded-lg p-2">
+              <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between bg-gradient-to-r from-video-control/90 to-video-bg/90 backdrop-blur-md rounded-lg p-3 border border-white/10">
                 <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
                     onClick={handleToggleCall}
-                    className="bg-red-500 hover:bg-red-600 text-white border-red-500 transition-colors"
+                    className="w-10 h-10 bg-video-inactive hover:bg-red-600 text-white rounded-full flex items-center justify-center transition-all duration-200 shadow-lg"
                   >
                     <PhoneOff className="w-4 h-4" />
-                  </Button>
+                  </motion.button>
                 </div>
 
                 <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
                     onClick={toggleAudio}
-                    className={`${isAudioEnabled ? 'bg-white/20 hover:bg-white/30' : 'bg-red-500 hover:bg-red-600'} text-white border-white/30 transition-colors`}
+                    className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200 shadow-lg ${
+                      isAudioEnabled 
+                        ? 'bg-video-active hover:bg-green-600 text-white' 
+                        : 'bg-video-inactive hover:bg-red-600 text-white'
+                    }`}
                   >
                     {isAudioEnabled ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
-                  </Button>
+                  </motion.button>
                   
-                  <Button
-                    size="sm"
-                    variant="outline"
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
                     onClick={toggleVideo}
-                    className={`${isVideoEnabled ? 'bg-white/20 hover:bg-white/30' : 'bg-red-500 hover:bg-red-600'} text-white border-white/30 transition-colors`}
+                    className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200 shadow-lg ${
+                      isVideoEnabled 
+                        ? 'bg-video-active hover:bg-green-600 text-white' 
+                        : 'bg-video-inactive hover:bg-red-600 text-white'
+                    }`}
                   >
                     {isVideoEnabled ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
-                  </Button>
+                  </motion.button>
                   
-                  <Button
-                    size="sm"
-                    variant="outline"
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
                     onClick={toggleMinimize}
-                    className="bg-white/20 hover:bg-white/30 text-white border-white/30 transition-colors"
+                    className="w-10 h-10 bg-white/20 hover:bg-white/30 text-white rounded-full flex items-center justify-center transition-all duration-200 shadow-lg"
                   >
                     {isMinimized ? <Maximize2 className="w-4 h-4" /> : <Minimize2 className="w-4 h-4" />}
-                  </Button>
+                  </motion.button>
                   
-                  <Button
-                    size="sm"
-                    variant="outline"
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
                     onClick={togglePiP}
-                    className="bg-white/20 hover:bg-white/30 text-white border-white/30 transition-colors"
+                    className="w-10 h-10 bg-white/20 hover:bg-white/30 text-white rounded-full flex items-center justify-center transition-all duration-200 shadow-lg"
                   >
                     {isPiP ? <Maximize2 className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
-                  </Button>
+                  </motion.button>
                 </div>
               </div>
 
