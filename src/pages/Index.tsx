@@ -4,14 +4,8 @@ import { motion } from 'framer-motion';
 import { useAuth } from '@/hooks/useAuth';
 import { useRoom, Room } from '@/hooks/useRoom';
 import { RoomControls } from '@/components/RoomControls';
-import { SharedCalendar } from '@/components/SharedCalendar';
-import { NotesTimeline } from '@/components/NotesTimeline';
-import { LoveMeter } from '@/components/LoveMeter';
-import { MovieRecommendations } from '@/components/MovieRecommendations';
-import { ThemeSelector } from '@/components/ThemeSelector';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Heart, LogOut } from 'lucide-react';
+import { Heart, LogOut, Video, Users, Sparkles } from 'lucide-react';
 
 const Index = () => {
   const navigate = useNavigate();
@@ -58,7 +52,7 @@ const Index = () => {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50 dark:from-gray-900 dark:to-gray-800"
+      className="min-h-screen bg-gradient-to-br from-love-pink/10 via-love-purple/10 to-background"
     >
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
@@ -68,11 +62,11 @@ const Index = () => {
           className="flex items-center justify-between mb-12"
         >
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-pink-500 to-purple-600 rounded-full flex items-center justify-center">
-              <Heart className="w-6 h-6 text-white" />
+            <div className="w-12 h-12 bg-gradient-to-br from-love-pink to-love-purple rounded-full flex items-center justify-center shadow-lg">
+              <Heart className="w-7 h-7 text-white" fill="white" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent">
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-love-pink to-love-purple bg-clip-text text-transparent">
                 UsTwo
               </h1>
               <p className="text-sm text-muted-foreground">
@@ -98,15 +92,15 @@ const Index = () => {
         </motion.div>
 
         {/* Main Content */}
-        <div className="max-w-6xl mx-auto">
+        <div className="max-w-5xl mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-            className="text-center space-y-4 mb-8"
+            className="text-center space-y-6 mb-12"
           >
-            <h2 className="text-4xl font-bold text-foreground">
-              Create Your Private Cinema
+            <h2 className="text-5xl font-bold text-foreground">
+              Your Private Cinema Awaits
             </h2>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
               Share movies, TV shows, and special moments with your partner in real-time. 
@@ -114,90 +108,91 @@ const Index = () => {
             </p>
           </motion.div>
 
+          {/* Room Controls - Main Focus */}
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.4 }}
+            className="mb-12"
           >
-            <Tabs defaultValue="rooms" className="w-full">
-              <TabsList className="grid w-full grid-cols-6 mb-8">
-                <TabsTrigger value="rooms">Rooms</TabsTrigger>
-                <TabsTrigger value="calendar">Calendar</TabsTrigger>
-                <TabsTrigger value="notes">Notes</TabsTrigger>
-                <TabsTrigger value="stats">Love Meter</TabsTrigger>
-                <TabsTrigger value="recommendations">AI Movies</TabsTrigger>
-                <TabsTrigger value="themes">Themes</TabsTrigger>
-              </TabsList>
+            <RoomControls
+              room={currentRoom}
+              onRoomCreated={handleRoomCreated}
+              onRoomJoined={handleRoomJoined}
+            />
+          </motion.div>
 
-              <TabsContent value="rooms" className="space-y-6">
-                <div className="max-w-md mx-auto">
-                  <RoomControls
-                    room={currentRoom}
-                    onRoomCreated={handleRoomCreated}
-                    onRoomJoined={handleRoomJoined}
-                  />
+          {/* Features Grid */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.6 }}
+            className="grid grid-cols-1 md:grid-cols-3 gap-6"
+          >
+            <div className="p-6 rounded-lg border border-border bg-card hover:shadow-lg transition-shadow">
+              <Video className="w-10 h-10 mb-4 text-love-pink" />
+              <h3 className="font-semibold mb-2">Synced Playback</h3>
+              <p className="text-sm text-muted-foreground">
+                Watch videos perfectly synchronized with your partner. Supports YouTube, Vimeo, and local files.
+              </p>
+            </div>
+            
+            <div className="p-6 rounded-lg border border-border bg-card hover:shadow-lg transition-shadow">
+              <Users className="w-10 h-10 mb-4 text-love-purple" />
+              <h3 className="font-semibold mb-2">Video Calls</h3>
+              <p className="text-sm text-muted-foreground">
+                See and talk to each other while watching. Stable, high-quality WebRTC video calls.
+              </p>
+            </div>
+            
+            <div className="p-6 rounded-lg border border-border bg-card hover:shadow-lg transition-shadow">
+              <Sparkles className="w-10 h-10 mb-4 text-love-pink" />
+              <h3 className="font-semibold mb-2">AI Recommendations</h3>
+              <p className="text-sm text-muted-foreground">
+                Get personalized movie suggestions based on both your preferences and watch history.
+              </p>
+            </div>
+          </motion.div>
+
+          {/* How it works */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.8 }}
+            className="mt-16 text-center space-y-8"
+          >
+            <h3 className="text-2xl font-bold">How It Works</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              <div className="space-y-3">
+                <div className="w-16 h-16 bg-gradient-to-br from-love-pink to-love-purple rounded-full flex items-center justify-center mx-auto text-white font-bold text-xl">
+                  1
                 </div>
-
-                {/* How it works section */}
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.6 }}
-                  className="text-center space-y-4"
-                >
-                  <h3 className="text-lg font-semibold">How it works</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="text-center space-y-2">
-                      <div className="w-12 h-12 bg-pink-100 dark:bg-pink-900 rounded-full flex items-center justify-center mx-auto">
-                        <span className="text-pink-600 dark:text-pink-400 font-bold">1</span>
-                      </div>
-                      <h4 className="font-medium">Create or Join</h4>
-                      <p className="text-sm text-muted-foreground">
-                        One partner creates a room, the other joins with the code
-                      </p>
-                    </div>
-                    <div className="text-center space-y-2">
-                      <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900 rounded-full flex items-center justify-center mx-auto">
-                        <span className="text-purple-600 dark:text-purple-400 font-bold">2</span>
-                      </div>
-                      <h4 className="font-medium">Watch Together</h4>
-                      <p className="text-sm text-muted-foreground">
-                        Video playback automatically syncs between both of you
-                      </p>
-                    </div>
-                    <div className="text-center space-y-2">
-                      <div className="w-12 h-12 bg-pink-100 dark:bg-pink-900 rounded-full flex items-center justify-center mx-auto">
-                        <span className="text-pink-600 dark:text-pink-400 font-bold">3</span>
-                      </div>
-                      <h4 className="font-medium">Stay Connected</h4>
-                      <p className="text-sm text-muted-foreground">
-                        Optional video calls and real-time reactions
-                      </p>
-                    </div>
-                  </div>
-                </motion.div>
-              </TabsContent>
-
-              <TabsContent value="calendar">
-                <SharedCalendar partnerId={currentRoom?.partner_id} />
-              </TabsContent>
-
-              <TabsContent value="notes">
-                <NotesTimeline />
-              </TabsContent>
-
-              <TabsContent value="stats">
-                <LoveMeter partnerId={currentRoom?.partner_id} />
-              </TabsContent>
-
-<TabsContent value="recommendations">
-  <MovieRecommendations roomId={currentRoom?.id} partnerId={currentRoom?.partner_id} />
-</TabsContent>
-
-              <TabsContent value="themes">
-                <ThemeSelector />
-              </TabsContent>
-            </Tabs>
+                <h4 className="font-medium text-lg">Create or Join</h4>
+                <p className="text-sm text-muted-foreground">
+                  One partner creates a room and shares the code. The other joins instantly.
+                </p>
+              </div>
+              
+              <div className="space-y-3">
+                <div className="w-16 h-16 bg-gradient-to-br from-love-purple to-love-pink rounded-full flex items-center justify-center mx-auto text-white font-bold text-xl">
+                  2
+                </div>
+                <h4 className="font-medium text-lg">Watch Together</h4>
+                <p className="text-sm text-muted-foreground">
+                  Upload videos, paste links, or use OTT platforms. Everything syncs automatically.
+                </p>
+              </div>
+              
+              <div className="space-y-3">
+                <div className="w-16 h-16 bg-gradient-to-br from-love-pink to-love-purple rounded-full flex items-center justify-center mx-auto text-white font-bold text-xl">
+                  3
+                </div>
+                <h4 className="font-medium text-lg">Stay Connected</h4>
+                <p className="text-sm text-muted-foreground">
+                  Video call, chat, react with hearts, and track your memories together.
+                </p>
+              </div>
+            </div>
           </motion.div>
         </div>
       </div>

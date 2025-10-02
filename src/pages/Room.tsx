@@ -1,21 +1,26 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useRoom, Room as RoomType } from '@/hooks/useRoom';
 import { useAuth } from '@/hooks/useAuth';
-import { EnhancedVideoPlayer } from '@/components/EnhancedVideoPlayer';
+import { RoomSidebar } from '@/components/RoomSidebar';
+import { VideoTab } from '@/components/tabs/VideoTab';
+import { CallTab } from '@/components/tabs/CallTab';
+import { NotesTab } from '@/components/tabs/NotesTab';
+import { CalendarTab } from '@/components/tabs/CalendarTab';
+import { AIMoviesTab } from '@/components/tabs/AIMoviesTab';
+import { LoveMeterTab } from '@/components/tabs/LoveMeterTab';
+import { ThemesTab } from '@/components/tabs/ThemesTab';
 import { FloatingHearts } from '@/components/FloatingHearts';
 import { ChatWidget } from '@/components/ChatWidget';
 import { WatchPartyEffects } from '@/components/WatchPartyEffects';
 import { ExtensionBridge } from '@/components/ExtensionBridge';
-import { RoomControls } from '@/components/RoomControls';
-import { VideoCall } from '@/components/VideoCall';
 import { PartnerPresence } from '@/components/PartnerPresence';
-import { AIRecommendations } from '@/components/AIRecommendations';
-import { PreferencesSetup } from '@/components/PreferencesSetup';
-
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Heart, Settings, Sparkles } from 'lucide-react';
+import { Heart, ArrowLeft } from 'lucide-react';
+import { useRoomPresence } from '@/hooks/useRoomPresence';
+
+type TabType = 'video' | 'call' | 'notes' | 'calendar' | 'ai-movies' | 'love-meter' | 'themes' | 'settings';
 
 const Room: React.FC = () => {
   const { roomId } = useParams<{ roomId: string }>();
@@ -23,11 +28,12 @@ const Room: React.FC = () => {
   const { user, loading: authLoading } = useAuth();
   const { room, fetchRoom, loading } = useRoom();
   const [currentRoom, setCurrentRoom] = useState<RoomType | null>(null);
+  const [activeTab, setActiveTab] = useState<TabType>('video');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [heartTrigger, setHeartTrigger] = useState(false);
   const [playbackState, setPlaybackState] = useState({ isPlaying: false, currentTime: 0 });
-  const [chatMinimized, setChatMinimized] = useState(false);
-  const [showPreferences, setShowPreferences] = useState(false);
-  const [showAIRecommendations, setShowAIRecommendations] = useState(false);
+  const [chatMinimized, setChatMinimized] = useState(true);
+  const { partnerJoined } = useRoomPresence(roomId || '');
 
   useEffect(() => {
     if (roomId && !authLoading && user) {
@@ -74,109 +80,110 @@ const Room: React.FC = () => {
     );
   }
 
+  const renderTabContent = () => {
+    if (!roomId || !currentRoom) return null;
+
+    switch (activeTab) {
+      case 'video':
+        return (
+          <VideoTab
+            roomId={roomId}
+            roomCode={currentRoom.room_code}
+            onPlaybackStateChange={(state) => {
+              setPlaybackState({
+                isPlaying: state.is_playing || false,
+                currentTime: state.current_time_seconds || 0
+              });
+            }}
+          />
+        );
+      case 'call':
+        return <CallTab roomId={roomId} roomCode={currentRoom.room_code} />;
+      case 'notes':
+        return <NotesTab />;
+      case 'calendar':
+        return <CalendarTab partnerId={currentRoom.partner_id} />;
+      case 'ai-movies':
+        return (
+          <AIMoviesTab
+            roomId={roomId}
+            roomCode={currentRoom.room_code || ''}
+            partnerId={currentRoom.partner_id}
+          />
+        );
+      case 'love-meter':
+        return <LoveMeterTab partnerId={currentRoom.partner_id} />;
+      case 'themes':
+        return <ThemesTab />;
+      case 'settings':
+        return (
+          <div className="text-center space-y-4 p-8">
+            <h2 className="text-2xl font-bold">Room Settings</h2>
+            <p className="text-muted-foreground">Coming soon...</p>
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="min-h-screen bg-background"
-    >
-      <div className="container mx-auto px-4 py-8 space-y-8">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <Button
-            variant="ghost"
-            onClick={() => navigate('/')}
-            className="flex items-center gap-2"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Home
-          </Button>
-        </div>
+    <div className="min-h-screen bg-background flex">
+      {/* Sidebar Navigation */}
+      <RoomSidebar
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        roomCode={currentRoom?.room_code}
+        isPartnerOnline={partnerJoined}
+        isCollapsed={sidebarCollapsed}
+        onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+      />
 
-        {/* Room Controls */}
-        <RoomControls room={currentRoom} />
+      {/* Main Content */}
+      <motion.main
+        initial={{ opacity: 0 }}
+        animate={{ 
+          opacity: 1,
+          marginLeft: sidebarCollapsed ? 80 : 280
+        }}
+        transition={{ duration: 0.3 }}
+        className="flex-1 min-h-screen overflow-y-auto"
+      >
+        <div className="container mx-auto px-6 py-8 max-w-7xl">
+          {/* Partner Presence Indicator */}
+          {roomId && (
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-6"
+            >
+              <PartnerPresence roomId={roomId} />
+            </motion.div>
+          )}
 
-        {/* Partner Presence */}
-        {roomId && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-          >
-            <PartnerPresence roomId={roomId} />
-          </motion.div>
-        )}
-
-        {/* Video Call */}
-        {roomId && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="max-w-4xl mx-auto"
-          >
-            <VideoCall roomId={roomId} roomCode={currentRoom?.room_code} />
-          </motion.div>
-        )}
-
-        {/* Media Player */}
-        {roomId && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-            className="space-y-4"
-          >
-            <div className="text-center">
-              <h3 className="text-lg font-semibold mb-2">Now Watching Together</h3>
-              <p className="text-muted-foreground text-sm">
-                Playback is automatically synchronized between you and your partner. 
-                All play, pause, seek, and buffering events are shared in real-time.
-              </p>
+          {/* Tab Content */}
+          <AnimatePresence mode="wait">
+            <div key={activeTab}>
+              {renderTabContent()}
             </div>
-            <EnhancedVideoPlayer 
-              roomId={roomId}
-              roomCode={currentRoom?.room_code}
-              onPlaybackStateChange={(state) => {
-                setPlaybackState({
-                  isPlaying: state.is_playing || false,
-                  currentTime: state.current_time_seconds || 0
-                });
-              }}
-            />
-          </motion.div>
-        )}
+          </AnimatePresence>
 
-        {/* AI Recommendations */}
-        {roomId && showAIRecommendations && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
-            className="max-w-6xl mx-auto"
-          >
-            <AIRecommendations 
-              roomId={roomId}
-              roomCode={currentRoom?.room_code || ''}
-              partnerId={currentRoom?.partner_id || undefined}
-            />
-          </motion.div>
-        )}
-
-        {/* Extension Bridge for OTT Sync */}
-        {roomId && currentRoom && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.6 }}
-          >
-            <ExtensionBridge 
-              roomId={roomId} 
-              roomCode={currentRoom.room_code || ''} 
-            />
-          </motion.div>
-        )}
-      </div>
+          {/* Extension Bridge */}
+          {roomId && currentRoom && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.5 }}
+              className="mt-8"
+            >
+              <ExtensionBridge 
+                roomId={roomId} 
+                roomCode={currentRoom.room_code || ''} 
+              />
+            </motion.div>
+          )}
+        </div>
+      </motion.main>
       
       {/* Chat Widget */}
       {roomId && (
@@ -197,30 +204,9 @@ const Room: React.FC = () => {
         />
       )}
       
-      {/* Preferences Setup Modal */}
-      {showPreferences && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-background rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-semibold">Setup Your Preferences</h2>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowPreferences(false)}
-                >
-                  ✕
-                </Button>
-              </div>
-              <PreferencesSetup onClose={() => setShowPreferences(false)} />
-            </div>
-          </div>
-        </div>
-      )}
-      
       {/* Floating Hearts */}
       <FloatingHearts trigger={heartTrigger} />
-    </motion.div>
+    </div>
   );
 };
 
