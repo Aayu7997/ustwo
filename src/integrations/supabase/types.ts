@@ -617,6 +617,31 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      get_invite_by_code: {
+        Args: { p_invite_code: string }
+        Returns: {
+          created_at: string
+          expires_at: string
+          id: string
+          receiver_id: string
+          sender_id: string
+          status: Database["public"]["Enums"]["invite_status"]
+        }[]
+      }
+      get_room_if_member: {
+        Args: { p_room_id: string }
+        Returns: {
+          created_at: string
+          creator_id: string
+          id: string
+          is_private: boolean | null
+          name: string
+          partner_id: string | null
+          room_code: string | null
+          status: Database["public"]["Enums"]["room_status"] | null
+          updated_at: string
+        }
+      }
       join_room_by_code: {
         Args: { p_code: string }
         Returns: {
