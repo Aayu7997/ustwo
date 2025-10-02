@@ -127,91 +127,54 @@ export const useRoom = (roomId?: string) => {
 
     setLoading(true);
     try {
-      console.log('Joining room with code:', trimmedCode);
-      
-      // First try to find the room directly
-      const { data: roomData, error: roomError } = await supabase
-        .from('rooms')
-        .select('*')
-        .eq('room_code', trimmedCode)
-        .single();
+      console.log('Joining room with code (RPC):', trimmedCode);
 
-      if (roomError) {
-        console.error('Room query error:', roomError);
-        if (roomError.code === 'PGRST116') {
-          throw new Error(`Room code "${trimmedCode}" not found. Please check the code and try again.`);
-        }
-        throw roomError;
+      // Use secure RPC to join by code (handles membership + partner assignment)
+      const { data, error } = await supabase.rpc('join_room_by_code', { p_code: trimmedCode });
+
+      if (error) {
+        console.error('join_room_by_code error:', error);
+        throw error;
       }
 
-      if (!roomData) {
-        throw new Error(`Room code "${trimmedCode}" not found. Please check the code and try again.`);
+      if (!data) {
+        throw new Error(`Room code "${trimmedCode}" not found or not accessible.`);
       }
 
-      // If partner slot is empty and user is not the creator, set as partner
-      if (roomData.partner_id === null && roomData.creator_id !== user.id) {
-        const { data: updatedRoom, error: updateError } = await supabase
-          .from('rooms')
-          .update({ partner_id: user.id })
-          .eq('id', roomData.id)
-          .select()
-          .single();
+      const roomData = data as Room;
 
-        if (updateError) {
-          console.error('Failed to set partner:', updateError);
-        } else {
-          roomData.partner_id = user.id;
-        }
-      }
-
-      // Ensure user is in room_members
-      const { error: memberError } = await supabase
-        .from('room_members')
-        .upsert({
-          room_id: roomData.id,
-          user_id: user.id
-        }, {
-          onConflict: 'room_id,user_id'
-        });
-
-      if (memberError) {
-        console.error('Failed to add to room_members:', memberError);
-      }
-
-      console.log('Successfully joined room:', roomData);
+      console.log('Successfully joined room via RPC:', roomData);
       setRoom(roomData);
-      
+
       if (roomData.creator_id === user.id) {
         toast({
-          title: "Welcome Back! 💕",
+          title: 'Welcome Back! 💕',
           description: `You're the creator of "${roomData.name}"`
         });
       } else {
         toast({
-          title: "Joined Room! 💕", 
+          title: 'Joined Room! 💕',
           description: `Welcome to "${roomData.name}"! You can now start watching together.`
         });
       }
-      
-      return roomData;
 
+      return roomData;
     } catch (error: any) {
       console.error('Join room failed:', error);
-      
-      // Provide helpful error messages
-      let errorMessage = error.message;
-      if (error.message?.includes('not found') || error.code === 'PGRST116') {
+
+      let errorMessage = error?.message || 'Failed to join room';
+      if (errorMessage.includes('invalid_or_expired_invite')) {
+        errorMessage = 'This invite code is invalid or has expired.';
+      } else if (errorMessage.includes('not_authenticated')) {
+        errorMessage = 'Please sign in to join a room.';
+      } else if (errorMessage.includes('not found')) {
         errorMessage = `Room code "${trimmedCode}" not found. Please double-check the code and try again.`;
-      } else if (error.message?.includes('duplicate')) {
-        errorMessage = 'You are already in this room!';
-      } else if (error.message?.includes('network') || error.message?.includes('fetch')) {
-        errorMessage = 'Connection error. Please check your internet and try again.';
       }
 
       toast({
-        title: "Unable to Join Room",
+        title: 'Unable to Join Room',
         description: errorMessage,
-        variant: "destructive"
+        variant: 'destructive'
       });
       return null;
     } finally {

@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { YouTubePlayer } from '@/components/YouTubePlayer';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -67,6 +68,7 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
   // Media source states
   const [videoSrc, setVideoSrc] = useState('');
   const [youtubeUrl, setYoutubeUrl] = useState('');
+  const [youtubeVideoId, setYoutubeVideoId] = useState<string | null>(null);
   const [directUrl, setDirectUrl] = useState('');
   const [currentFile, setCurrentFile] = useState<File | null>(null);
   const [currentMediaType, setCurrentMediaType] = useState<'local' | 'url' | 'youtube' | 'hls' | 'torrent'>('local');
@@ -295,20 +297,18 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
   const handleYouTubeLoad = () => {
     const videoId = extractYouTubeId(youtubeUrl);
     if (videoId) {
-      // Create embedded YouTube player URL
-      const embedUrl = `https://www.youtube.com/embed/${videoId}?enablejsapi=1&origin=${window.location.origin}`;
-      setVideoSrc(embedUrl);
+      setYoutubeVideoId(videoId);
       setCurrentMediaType('youtube');
       
       toast({
-        title: "YouTube Video Loaded! 📺",
-        description: "YouTube video is ready to play"
+        title: 'YouTube Video Loaded! 📺',
+        description: 'YouTube video is ready to play'
       });
     } else {
       toast({
-        title: "Invalid YouTube URL",
-        description: "Please enter a valid YouTube URL",
-        variant: "destructive"
+        title: 'Invalid YouTube URL',
+        description: 'Please enter a valid YouTube URL',
+        variant: 'destructive'
       });
     }
   };
@@ -341,6 +341,16 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
     };
   }, [handleTimeUpdate, handleLoadedMetadata, handlePlay, handlePause]);
 
+  // Cleanup HLS on unmount
+  useEffect(() => {
+    return () => {
+      if (hlsRef.current) {
+        try { hlsRef.current.destroy(); } catch {}
+        hlsRef.current = null;
+      }
+    };
+  }, []);
+
   // Update video source
   useEffect(() => {
     if (videoRef.current && videoSrc && currentMediaType !== 'torrent') {
@@ -356,13 +366,22 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
     >
       <Card className="overflow-hidden">
         <div className="relative bg-black">
-          {/* Video Element */}
-          <video
-            ref={videoRef}
-            className="w-full aspect-video object-contain"
-            controls={false}
-            playsInline
-          />
+          {/* Video or YouTube Element */}
+          {currentMediaType === 'youtube' && youtubeVideoId ? (
+            <div className="w-full">
+              {/* Render dedicated YouTube player component */}
+              {/* @ts-ignore - imported dynamically below */}
+              <YouTubePlayer videoId={youtubeVideoId} />
+            </div>
+          ) : (
+            <video
+              ref={videoRef}
+              className="w-full aspect-video object-contain"
+              controls={false}
+              playsInline
+              crossOrigin="anonymous"
+            />
+          )}
           
           {/* Loading Overlay */}
           {isLoading && (

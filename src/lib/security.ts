@@ -20,7 +20,7 @@ export const addSecurityHeaders = () => {
     "img-src 'self' data: https:; " +
     "media-src 'self' blob: https:; " +
     "connect-src 'self' https://*.supabase.co wss://*.supabase.co; " +
-    "frame-src 'none'; " +
+    "frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com https://player.vimeo.com; " +
     "object-src 'none';"
   );
 
@@ -35,7 +35,7 @@ export const addSecurityHeaders = () => {
 
   // Permissions Policy
   setMetaTag('Permissions-Policy', 
-    'camera=(), microphone=(), geolocation=(), payment=(), usb=()'
+    'camera=(self), microphone=(self), geolocation=(), payment=(), usb=()'
   );
 };
 

@@ -248,6 +248,7 @@ export const useWebRTC = ({ roomId, roomCode, enabled }: WebRTCProps) => {
       });
     } catch (error) {
       console.error('Failed to start call:', error);
+      throw error; // Propagate so caller can handle UI state
     }
   }, [enabled, user, initializeMedia, createPeer]);
 
@@ -313,7 +314,7 @@ export const useWebRTC = ({ roomId, roomCode, enabled }: WebRTCProps) => {
         filter: `room_id=eq.${roomId}`
       }, (payload) => {
         const signalData = payload.new;
-        
+
         // Ignore our own signals
         if (signalData.sender === user.id) {
           console.log('Ignoring own signal');
@@ -322,7 +323,7 @@ export const useWebRTC = ({ roomId, roomCode, enabled }: WebRTCProps) => {
 
         console.log('Received signal:', signalData.type, 'from:', signalData.sender);
         const signal = signalData.payload;
-        
+
         if (signal.type === 'offer' && !peer) {
           console.log('Receiving call offer');
           answerCall(signal);
@@ -346,7 +347,7 @@ export const useWebRTC = ({ roomId, roomCode, enabled }: WebRTCProps) => {
         supabase.removeChannel(channelRef.current);
       }
     };
-  }, [roomId, enabled, user, peer, answerCall]);
+  }, [roomId, enabled, user, answerCall]);
 
   // Cleanup on unmount
   useEffect(() => {
