@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { 
   Video, 
-  PhoneCall, 
   FileText, 
   Calendar, 
   Film, 
@@ -19,7 +18,7 @@ import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
 
-type TabType = 'video' | 'call' | 'notes' | 'calendar' | 'ai-movies' | 'love-meter' | 'themes' | 'settings';
+type TabType = 'video' | 'notes' | 'calendar' | 'ai-movies' | 'love-meter' | 'themes' | 'settings';
 
 interface RoomSidebarProps {
   activeTab: TabType;
@@ -42,8 +41,7 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
   const [copied, setCopied] = React.useState(false);
 
   const tabs = [
-    { id: 'video' as TabType, label: 'Video Player', icon: Video },
-    { id: 'call' as TabType, label: 'Video Call', icon: PhoneCall },
+    { id: 'video' as TabType, label: 'Watch & Call', icon: Video },
     { id: 'notes' as TabType, label: 'Notes', icon: FileText },
     { id: 'calendar' as TabType, label: 'Calendar', icon: Calendar },
     { id: 'ai-movies' as TabType, label: 'AI Movies', icon: Film },

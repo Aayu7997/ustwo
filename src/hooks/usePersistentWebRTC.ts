@@ -3,11 +3,13 @@ import SimplePeer from 'simple-peer';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { toast } from '@/hooks/use-toast';
+import { getVideoConstraints, VideoQuality, DEFAULT_QUALITY } from '@/utils/videoQuality';
 
 interface PersistentWebRTCProps {
   roomId: string;
   roomCode?: string;
   enabled: boolean;
+  quality?: VideoQuality;
 }
 
 type ConnectionState = 'idle' | 'connecting' | 'connected' | 'disconnected' | 'failed' | 'reconnecting';
@@ -32,7 +34,7 @@ const ICE_SERVERS = [
   }
 ];
 
-export const usePersistentWebRTC = ({ roomId, roomCode, enabled }: PersistentWebRTCProps) => {
+export const usePersistentWebRTC = ({ roomId, roomCode, enabled, quality = DEFAULT_QUALITY }: PersistentWebRTCProps) => {
   const { user } = useAuth();
   const [peer, setPeer] = useState<SimplePeer.Instance | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -51,15 +53,10 @@ export const usePersistentWebRTC = ({ roomId, roomCode, enabled }: PersistentWeb
   // Initialize media stream
   const initializeMedia = useCallback(async () => {
     try {
-      console.log('[WebRTC] Requesting media permissions...');
+      console.log('[WebRTC] Requesting media with quality:', quality);
       
       const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          width: { ideal: 1280, max: 1920 },
-          height: { ideal: 720, max: 1080 },
-          facingMode: 'user',
-          frameRate: { ideal: 30 }
-        },
+        video: getVideoConstraints(quality),
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
@@ -86,7 +83,7 @@ export const usePersistentWebRTC = ({ roomId, roomCode, enabled }: PersistentWeb
       });
       throw error;
     }
-  }, []);
+  }, [quality]);
 
   // Create peer connection with proper configuration
   const createPeer = useCallback(async (initiator: boolean, mediaStream: MediaStream) => {

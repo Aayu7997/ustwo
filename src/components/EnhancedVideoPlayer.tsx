@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
 import { 
   Play, 
@@ -28,6 +29,8 @@ import {
 import Hls from 'hls.js';
 import { useRoom } from '@/hooks/useRoom';
 import { useWebTorrent } from '@/hooks/useWebTorrent';
+import { useVideoQuality } from '@/hooks/useVideoQuality';
+import { VIDEO_QUALITY_PRESETS, VideoQuality } from '@/utils/videoQuality';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -44,7 +47,8 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
 }) => {
   const { user } = useAuth();
   const { updatePlaybackState } = useRoom(roomId);
-  const { 
+  const { quality, setQuality } = useVideoQuality();
+  const {
     seedFile, 
     isSeeding, 
     downloadProgress, 
@@ -75,7 +79,6 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
   
   // Settings
   const [enableP2P, setEnableP2P] = useState(true);
-  const [quality, setQuality] = useState('auto');
   const [enableSync, setEnableSync] = useState(true);
 
   // Update playback state callback
@@ -629,6 +632,31 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
                     className="w-full"
                   />
                   <p className="text-sm text-muted-foreground">{playbackSpeed}x speed</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Video Quality</Label>
+                  <Select value={quality} onValueChange={(value) => setQuality(value as VideoQuality)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select quality" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(VIDEO_QUALITY_PRESETS).map(([key, preset]) => (
+                        <SelectItem key={key} value={key}>
+                          <div className="flex flex-col items-start">
+                            <span className="font-medium">{preset.label}</span>
+                            <span className="text-xs text-muted-foreground">{preset.description}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-sm text-muted-foreground">
+                    Current: {VIDEO_QUALITY_PRESETS[quality].label}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Quality applies to video calls. For video playback, quality depends on the source.
+                  </p>
                 </div>
               </div>
             </TabsContent>

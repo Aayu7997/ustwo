@@ -5,7 +5,6 @@ import { useRoom, Room as RoomType } from '@/hooks/useRoom';
 import { useAuth } from '@/hooks/useAuth';
 import { RoomSidebar } from '@/components/RoomSidebar';
 import { VideoTab } from '@/components/tabs/VideoTab';
-import { CallTab } from '@/components/tabs/CallTab';
 import { NotesTab } from '@/components/tabs/NotesTab';
 import { CalendarTab } from '@/components/tabs/CalendarTab';
 import { AIMoviesTab } from '@/components/tabs/AIMoviesTab';
@@ -20,7 +19,7 @@ import { Button } from '@/components/ui/button';
 import { Heart, ArrowLeft } from 'lucide-react';
 import { useRoomPresence } from '@/hooks/useRoomPresence';
 
-type TabType = 'video' | 'call' | 'notes' | 'calendar' | 'ai-movies' | 'love-meter' | 'themes' | 'settings';
+type TabType = 'video' | 'notes' | 'calendar' | 'ai-movies' | 'love-meter' | 'themes' | 'settings';
 
 const Room: React.FC = () => {
   const { roomId } = useParams<{ roomId: string }>();
@@ -97,8 +96,6 @@ const Room: React.FC = () => {
             }}
           />
         );
-      case 'call':
-        return <CallTab roomId={roomId} roomCode={currentRoom.room_code} />;
       case 'notes':
         return <NotesTab />;
       case 'calendar':

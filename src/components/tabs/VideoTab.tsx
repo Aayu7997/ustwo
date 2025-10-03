@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { EnhancedVideoPlayer } from '@/components/EnhancedVideoPlayer';
+import { IntegratedVideoPlayer } from '@/components/IntegratedVideoPlayer';
 
 interface VideoTabProps {
   roomId: string;
@@ -20,11 +20,11 @@ export const VideoTab: React.FC<VideoTabProps> = ({ roomId, roomCode, onPlayback
       <div className="text-center space-y-2">
         <h2 className="text-2xl font-bold">Watch Together</h2>
         <p className="text-muted-foreground">
-          Playback is automatically synchronized. Upload files, paste YouTube/Vimeo links, or use WebTorrent.
+          Playback is automatically synchronized. Upload files, paste YouTube/Vimeo links, or use WebTorrent. Video call available below.
         </p>
       </div>
       
-      <EnhancedVideoPlayer 
+      <IntegratedVideoPlayer 
         roomId={roomId}
         roomCode={roomCode}
         onPlaybackStateChange={onPlaybackStateChange}
