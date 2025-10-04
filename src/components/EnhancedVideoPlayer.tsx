@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { YouTubePlayer } from '@/components/YouTubePlayer';
+import { VimeoPlayer } from '@/components/VimeoPlayer';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -75,7 +76,7 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
   const [youtubeVideoId, setYoutubeVideoId] = useState<string | null>(null);
   const [directUrl, setDirectUrl] = useState('');
   const [currentFile, setCurrentFile] = useState<File | null>(null);
-  const [currentMediaType, setCurrentMediaType] = useState<'local' | 'url' | 'youtube' | 'hls' | 'torrent'>('local');
+  const [currentMediaType, setCurrentMediaType] = useState<'local' | 'url' | 'youtube' | 'vimeo' | 'hls' | 'torrent'>('local');
   
   // Settings
   const [enableP2P, setEnableP2P] = useState(true);
@@ -298,10 +299,21 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
   };
 
   const handleYouTubeLoad = () => {
+    if (!youtubeUrl.trim()) {
+      toast({
+        title: "No YouTube URL provided",
+        description: "Please enter a YouTube URL",
+        variant: "destructive"
+      });
+      return;
+    }
+
     const videoId = extractYouTubeId(youtubeUrl);
     if (videoId) {
+      console.log('Loading YouTube video:', videoId);
       setYoutubeVideoId(videoId);
       setCurrentMediaType('youtube');
+      setVideoSrc(''); // Clear other sources
       
       toast({
         title: 'YouTube Video Loaded! 📺',
@@ -310,7 +322,7 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
     } else {
       toast({
         title: 'Invalid YouTube URL',
-        description: 'Please enter a valid YouTube URL',
+        description: 'Please enter a valid YouTube video URL',
         variant: 'destructive'
       });
     }
@@ -372,9 +384,35 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
           {/* Video or YouTube Element */}
           {currentMediaType === 'youtube' && youtubeVideoId ? (
             <div className="w-full">
-              {/* Render dedicated YouTube player component */}
-              {/* @ts-ignore - imported dynamically below */}
-              <YouTubePlayer videoId={youtubeVideoId} />
+              <YouTubePlayer 
+                videoId={youtubeVideoId}
+                onPlaybackUpdate={(time, playing) => {
+                  setCurrentTime(time);
+                  setIsPlaying(playing);
+                  if (enableSync) {
+                    updatePlaybackState({
+                      is_playing: playing,
+                      current_time_seconds: time
+                    });
+                  }
+                }}
+              />
+            </div>
+          ) : currentMediaType === 'vimeo' ? (
+            <div className="w-full">
+              <VimeoPlayer 
+                videoId={videoSrc}
+                onPlaybackUpdate={(time, playing) => {
+                  setCurrentTime(time);
+                  setIsPlaying(playing);
+                  if (enableSync) {
+                    updatePlaybackState({
+                      is_playing: playing,
+                      current_time_seconds: time
+                    });
+                  }
+                }}
+              />
             </div>
           ) : (
             <video

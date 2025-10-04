@@ -10,10 +10,11 @@ import { CalendarTab } from '@/components/tabs/CalendarTab';
 import { AIMoviesTab } from '@/components/tabs/AIMoviesTab';
 import { LoveMeterTab } from '@/components/tabs/LoveMeterTab';
 import { ThemesTab } from '@/components/tabs/ThemesTab';
+import { SettingsTab } from '@/components/tabs/SettingsTab';
 import { FloatingHearts } from '@/components/FloatingHearts';
 import { ChatWidget } from '@/components/ChatWidget';
 import { WatchPartyEffects } from '@/components/WatchPartyEffects';
-import { ExtensionBridge } from '@/components/ExtensionBridge';
+
 import { PartnerPresence } from '@/components/PartnerPresence';
 import { Button } from '@/components/ui/button';
 import { Heart, ArrowLeft } from 'lucide-react';
@@ -113,12 +114,7 @@ const Room: React.FC = () => {
       case 'themes':
         return <ThemesTab />;
       case 'settings':
-        return (
-          <div className="text-center space-y-4 p-8">
-            <h2 className="text-2xl font-bold">Room Settings</h2>
-            <p className="text-muted-foreground">Coming soon...</p>
-          </div>
-        );
+        return <SettingsTab roomId={roomId} roomCode={currentRoom.room_code || ''} />;
       default:
         return null;
     }
@@ -165,20 +161,6 @@ const Room: React.FC = () => {
             </div>
           </AnimatePresence>
 
-          {/* Extension Bridge */}
-          {roomId && currentRoom && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.5 }}
-              className="mt-8"
-            >
-              <ExtensionBridge 
-                roomId={roomId} 
-                roomCode={currentRoom.room_code || ''} 
-              />
-            </motion.div>
-          )}
         </div>
       </motion.main>
       

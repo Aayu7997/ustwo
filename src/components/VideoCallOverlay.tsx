@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { usePersistentWebRTC } from '@/hooks/usePersistentWebRTC';
 import { useVideoPiP } from '@/hooks/useVideoPiP';
@@ -14,7 +14,8 @@ import {
   PhoneOff, 
   Maximize2, 
   Minimize2,
-  X
+  X,
+  Move
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { VIDEO_QUALITY_PRESETS } from '@/utils/videoQuality';
@@ -33,9 +34,11 @@ export const VideoCallOverlay: React.FC<VideoCallOverlayProps> = ({
   onClose
 }) => {
   const { quality } = useVideoQuality();
-  const { mode, position, toggleMode } = useVideoPiP();
+  const { mode, position, customPosition, isDragging, toggleMode, startDrag, endDrag, updateDragPosition } = useVideoPiP();
   const [isAudioEnabled, setIsAudioEnabled] = useState(true);
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
+  const dragRef = useRef<HTMLDivElement>(null);
+  const dragStartRef = useRef({ x: 0, y: 0 });
 
   const {
     localVideoRef,
@@ -78,19 +81,73 @@ export const VideoCallOverlay: React.FC<VideoCallOverlayProps> = ({
     }
   };
 
+  // Drag handlers
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDragging) return;
+      
+      const newX = e.clientX - dragStartRef.current.x;
+      const newY = e.clientY - dragStartRef.current.y;
+      
+      // Keep within viewport bounds
+      const maxX = window.innerWidth - (mode === 'pip' ? 264 : mode === 'full' ? 384 : 240);
+      const maxY = window.innerHeight - (mode === 'pip' ? 192 : mode === 'full' ? 288 : 48);
+      
+      const boundedX = Math.max(0, Math.min(newX, maxX));
+      const boundedY = Math.max(0, Math.min(newY, maxY));
+      
+      updateDragPosition(boundedX, boundedY);
+    };
+
+    const handleMouseUp = () => {
+      if (isDragging) {
+        endDrag();
+      }
+    };
+
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging, mode, endDrag, updateDragPosition]);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (!dragRef.current) return;
+    
+    const rect = dragRef.current.getBoundingClientRect();
+    dragStartRef.current = {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top
+    };
+    
+    startDrag();
+  };
+
   if (!isActive) return null;
 
-  const getPositionClasses = () => {
+  const getPositionStyles = () => {
+    if (position === 'custom') {
+      return {
+        left: `${customPosition.x}px`,
+        top: `${customPosition.y}px`
+      };
+    }
+    
     if (mode === 'minimized') {
-      return 'bottom-4 right-4';
+      return { bottom: '1rem', right: '1rem' };
     }
     
     switch (position) {
-      case 'top-right': return 'top-4 right-4';
-      case 'top-left': return 'top-4 left-4';
-      case 'bottom-right': return 'bottom-4 right-4';
-      case 'bottom-left': return 'bottom-4 left-4';
-      default: return 'bottom-4 right-4';
+      case 'top-right': return { top: '1rem', right: '1rem' };
+      case 'top-left': return { top: '1rem', left: '1rem' };
+      case 'bottom-right': return { bottom: '1rem', right: '1rem' };
+      case 'bottom-left': return { bottom: '1rem', left: '1rem' };
+      default: return { bottom: '1rem', right: '1rem' };
     }
   };
 
@@ -110,20 +167,26 @@ export const VideoCallOverlay: React.FC<VideoCallOverlayProps> = ({
   return (
     <AnimatePresence>
       <motion.div
+        ref={dragRef}
         initial={{ opacity: 0, scale: 0.8 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.8 }}
+        style={getPositionStyles()}
         className={cn(
           'fixed z-50',
-          getPositionClasses(),
-          getSizeClasses()
+          getSizeClasses(),
+          isDragging && 'cursor-grabbing'
         )}
       >
-        <Card className="h-full bg-black/95 border-primary/30 overflow-hidden backdrop-blur-sm">
+        <Card className="h-full bg-black/95 border-primary/30 overflow-hidden backdrop-blur-sm select-none">
           {isMinimized ? (
             // Minimized bar view
-            <div className="h-full flex items-center justify-between px-4">
+            <div 
+              className="h-full flex items-center justify-between px-4 cursor-grab active:cursor-grabbing"
+              onMouseDown={handleMouseDown}
+            >
               <div className="flex items-center gap-2">
+                <Move className="w-3 h-3 text-white/50" />
                 <div className={cn(
                   "w-2 h-2 rounded-full",
                   isConnected ? "bg-video-active animate-pulse" : "bg-red-500"
@@ -154,6 +217,14 @@ export const VideoCallOverlay: React.FC<VideoCallOverlayProps> = ({
           ) : (
             // Full/PiP view
             <div className="relative h-full">
+              {/* Drag handle */}
+              <div 
+                className="absolute top-0 left-0 right-0 h-8 cursor-grab active:cursor-grabbing flex items-center justify-center z-10"
+                onMouseDown={handleMouseDown}
+              >
+                <Move className="w-4 h-4 text-white/30" />
+              </div>
+
               {/* Remote video (partner) */}
               <video
                 ref={remoteVideoRef}
