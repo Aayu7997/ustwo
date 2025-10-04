@@ -204,12 +204,12 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
       initial={{ opacity: 0, y: 20, scale: 0.95 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: 20, scale: 0.95 }}
-      className="fixed bottom-4 right-4 z-50 w-80 h-96"
+      className="fixed bottom-4 right-4 z-[60] w-80 h-[500px]"
     >
-      <Card className="h-full flex flex-col shadow-xl">
-        <CardHeader className="p-3 pb-2">
+      <Card className="h-full flex flex-col shadow-2xl border-2 bg-card">
+        <CardHeader className="p-3 pb-2 border-b bg-muted/50">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-sm flex items-center gap-2">
+            <CardTitle className="text-sm flex items-center gap-2 font-semibold">
               <MessageCircle className="w-4 h-4" />
               Chat
             </CardTitle>
@@ -272,9 +272,9 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
           )}
         </AnimatePresence>
 
-        <CardContent className="flex-1 p-3 pt-0">
-          <ScrollArea className="h-full pr-2" ref={scrollAreaRef}>
-            <div className="space-y-2">
+        <CardContent className="flex-1 p-3 pt-2 flex flex-col overflow-hidden">
+          <ScrollArea className="flex-1 pr-2 mb-3" ref={scrollAreaRef}>
+            <div className="space-y-2 pb-2">
               {messages.length === 0 ? (
                 <div className="text-center text-muted-foreground text-sm py-8">
                   <MessageCircle className="w-8 h-8 mx-auto mb-2 opacity-50" />
@@ -289,17 +289,17 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
                     className={`flex ${message.sender_id === user?.id ? 'justify-end' : 'justify-start'}`}
                   >
                     <div
-                      className={`max-w-[80%] p-2 rounded-lg text-sm ${
+                      className={`max-w-[75%] p-2.5 rounded-lg text-sm break-words ${
                         message.sender_id === user?.id
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-muted'
+                          ? 'bg-primary text-primary-foreground shadow-md'
+                          : 'bg-muted shadow-sm'
                       } ${
                         message.type === 'emoji' || message.type === 'reaction'
                           ? 'text-2xl py-1 px-2'
                           : ''
                       }`}
                     >
-                      <div>{message.content}</div>
+                      <div className="break-words">{message.content}</div>
                       <div 
                         className={`text-xs mt-1 opacity-70 ${
                           message.sender_id === user?.id ? 'text-right' : 'text-left'
@@ -315,12 +315,12 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
             </div>
           </ScrollArea>
 
-          <form onSubmit={handleSubmit} className="flex gap-2 mt-3">
+          <form onSubmit={handleSubmit} className="flex gap-2 border-t pt-3">
             <Input
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
               placeholder="Type a message..."
-              className="flex-1"
+              className="flex-1 bg-background"
               maxLength={200}
             />
             <Button type="submit" size="sm" disabled={!newMessage.trim()}>

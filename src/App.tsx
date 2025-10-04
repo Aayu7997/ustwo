@@ -24,7 +24,7 @@ const App = () => {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
         <TooltipProvider>
-          <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 relative">
+          <div className="min-h-screen bg-background text-foreground relative">
             <div className="fixed top-4 right-4 z-50">
               <ThemeToggle />
             </div>

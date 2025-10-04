@@ -52,7 +52,7 @@ const Index = () => {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="min-h-screen bg-gradient-to-br from-love-pink/10 via-love-purple/10 to-background"
+      className="min-h-screen bg-background"
     >
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
