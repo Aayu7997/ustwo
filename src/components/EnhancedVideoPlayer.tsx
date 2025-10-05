@@ -247,6 +247,19 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
     setIsLoading(true);
     
     try {
+      // Check if it's a Vimeo URL
+      const vimeoMatch = directUrl.match(/vimeo\.com\/(\d+)/);
+      if (vimeoMatch) {
+        setVideoSrc(vimeoMatch[1]);
+        setCurrentMediaType('vimeo');
+        toast({
+          title: "Vimeo Video Loaded! 📺",
+          description: "Vimeo video is ready to play"
+        });
+        setIsLoading(false);
+        return;
+      }
+
       // Check if it's an HLS stream
       if (directUrl.includes('.m3u8')) {
         if (Hls.isSupported()) {
@@ -417,10 +430,19 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
           ) : (
             <video
               ref={videoRef}
+              src={videoSrc}
               className="w-full aspect-video object-contain"
               controls={false}
               playsInline
               crossOrigin="anonymous"
+              onError={(e) => {
+                console.error('Video playback error:', e);
+                toast({
+                  title: "Playback Error",
+                  description: "Failed to load video. Check URL or format.",
+                  variant: "destructive"
+                });
+              }}
             />
           )}
           

@@ -82,20 +82,29 @@ export const AIRecommendations: React.FC<AIRecommendationsProps> = ({
     fetchPreferences();
   }, [user, partnerId, roomId]);
 
-  const generateRecommendations = async () => {
-    if (!user || !partnerId) {
+  const generateRecommendations = async (mode: 'solo' | 'couple' = 'couple') => {
+    if (!user) {
       toast({
-        title: "Partner Required",
-        description: "You need a partner in the room to generate AI recommendations",
+        title: "Authentication Required",
+        description: "Please sign in to generate recommendations",
         variant: "destructive"
       });
       return;
     }
 
-    if (!userPreferences && !partnerPreferences) {
+    if (mode === 'couple' && !partnerId) {
+      toast({
+        title: "No Partner Yet",
+        description: "Your partner needs to join the room for couple recommendations. Try solo mode instead!",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!userPreferences && mode === 'solo') {
       toast({
         title: "Preferences Missing",
-        description: "Both you and your partner need to set up preferences first",
+        description: "Please set up your preferences first",
         variant: "destructive"
       });
       return;
@@ -106,9 +115,10 @@ export const AIRecommendations: React.FC<AIRecommendationsProps> = ({
       const { data, error } = await supabase.functions.invoke('ai-recommendations', {
         body: {
           userPreferences: userPreferences || {},
-          partnerPreferences: partnerPreferences || {},
+          partnerPreferences: mode === 'couple' ? (partnerPreferences || {}) : null,
           roomId,
-          partnerId
+          partnerId: mode === 'couple' ? partnerId : null,
+          mode
         }
       });
 
@@ -117,9 +127,10 @@ export const AIRecommendations: React.FC<AIRecommendationsProps> = ({
       setRecommendations(data.recommendations);
       setShowRecommendations(true);
       
+      const modeText = mode === 'couple' ? 'for you and your partner' : 'just for you';
       toast({
         title: "AI Magic! ✨",
-        description: `Generated ${data.recommendations.length} personalized recommendations for you and your partner!`
+        description: `Generated ${data.recommendations.length} personalized recommendations ${modeText}!`
       });
     } catch (error: any) {
       console.error('Error generating recommendations:', error);
@@ -190,32 +201,66 @@ export const AIRecommendations: React.FC<AIRecommendationsProps> = ({
         </p>
       </div>
 
-      {/* Generate Button */}
+      {/* Generate Buttons */}
       {!showRecommendations && (
-        <div className="text-center">
-          <Button
-            onClick={generateRecommendations}
-            disabled={loading}
-            className="relative overflow-hidden bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90 text-white px-8 py-3 rounded-xl font-medium shadow-lg hover:shadow-xl transition-all duration-300"
-          >
-            {loading ? (
-              <>
-                <motion.div
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                  className="mr-2"
-                >
-                  <Sparkles className="h-4 w-4" />
-                </motion.div>
-                Generating Magic...
-              </>
-            ) : (
-              <>
-                <Film className="mr-2 h-4 w-4" />
-                Get AI Suggestions
-              </>
+        <div className="text-center space-y-3">
+          <div className="flex justify-center gap-3">
+            <Button
+              onClick={() => generateRecommendations('solo')}
+              disabled={loading}
+              variant="outline"
+              className="px-6 py-3 rounded-xl font-medium shadow-md hover:shadow-lg transition-all duration-300"
+            >
+              {loading ? (
+                <>
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                    className="mr-2"
+                  >
+                    <Sparkles className="h-4 w-4" />
+                  </motion.div>
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Film className="mr-2 h-4 w-4" />
+                  Solo Mode
+                </>
+              )}
+            </Button>
+            
+            {partnerId && (
+              <Button
+                onClick={() => generateRecommendations('couple')}
+                disabled={loading}
+                className="relative overflow-hidden bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90 text-white px-6 py-3 rounded-xl font-medium shadow-lg hover:shadow-xl transition-all duration-300"
+              >
+                {loading ? (
+                  <>
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                      className="mr-2"
+                    >
+                      <Sparkles className="h-4 w-4" />
+                    </motion.div>
+                    Generating Magic...
+                  </>
+                ) : (
+                  <>
+                    <Heart className="mr-2 h-4 w-4" />
+                    Couple Mode
+                  </>
+                )}
+              </Button>
             )}
-          </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {partnerId 
+              ? "Choose solo for personal picks or couple for shared recommendations" 
+              : "Solo mode available - invite your partner for couple recommendations"}
+          </p>
         </div>
       )}
 

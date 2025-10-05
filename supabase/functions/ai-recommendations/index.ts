@@ -8,9 +8,10 @@ const corsHeaders = {
 
 interface RecommendationRequest {
   userPreferences: any;
-  partnerPreferences: any;
+  partnerPreferences?: any;
   roomId: string;
-  partnerId: string;
+  partnerId?: string | null;
+  mode?: 'solo' | 'couple';
 }
 
 interface Recommendation {
@@ -45,7 +46,7 @@ serve(async (req) => {
     }
 
     const requestBody = await req.json() as RecommendationRequest
-    const { userPreferences, partnerPreferences, roomId, partnerId } = requestBody
+    const { userPreferences, partnerPreferences, roomId, partnerId, mode = 'couple' } = requestBody
 
     // Validate required fields
     if (!roomId) {
@@ -59,9 +60,35 @@ serve(async (req) => {
       )
     }
 
-    console.log('Generating AI recommendations for room:', roomId)
+    console.log(`Generating AI recommendations for room: ${roomId} (mode: ${mode})`)
 
-    const prompt = `
+    const prompt = mode === 'solo' 
+      ? `
+Based on this user's movie/series/music preferences, suggest 5 diverse entertainment options they would enjoy:
+
+User Preferences:
+- Favorite Genres: ${userPreferences?.genres?.join(', ') || 'Not specified'}
+- Favorite Actors: ${userPreferences?.actors?.join(', ') || 'Not specified'}
+- Favorite Directors: ${userPreferences?.directors?.join(', ') || 'Not specified'}
+- Preferred Platforms: ${userPreferences?.platforms?.join(', ') || 'Netflix, Prime Video, YouTube'}
+- Dislikes: ${userPreferences?.disliked?.join(', ') || 'None specified'}
+
+Please suggest 5 movies/shows/documentaries they would enjoy on platforms like Netflix, Prime Video, Disney+, YouTube, HBO Max, or other streaming services.
+
+Respond ONLY with valid JSON in this exact format:
+[
+  {
+    "title": "Movie/Show Title",
+    "platform": "Netflix/Prime Video/Disney+/etc",
+    "why_recommended": "Detailed explanation of why this matches the user's preferences",
+    "genre": "Primary genre",
+    "rating": "IMDb rating or critic score if known"
+  }
+]
+
+Focus on finding content that perfectly matches their stated preferences and interests.
+`
+      : `
 Based on these two users' movie/series/music preferences, suggest 5 diverse entertainment options they can enjoy together:
 
 User A Preferences:
@@ -176,7 +203,7 @@ Focus on finding the perfect balance between both users' preferences. If they ha
       .insert({
         room_id: roomId,
         user_id: userData.user.id,
-        partner_id: partnerId,
+        partner_id: partnerId || userData.user.id, // Use user_id if no partner
         recommendations: recommendations
       })
 

@@ -642,6 +642,14 @@ export type Database = {
           updated_at: string
         }
       }
+      increment_hearts_received: {
+        Args: { p_date: string; p_partner_id: string; p_user_id: string }
+        Returns: undefined
+      }
+      increment_hearts_sent: {
+        Args: { p_date: string; p_partner_id: string; p_user_id: string }
+        Returns: undefined
+      }
       join_room_by_code: {
         Args: { p_code: string }
         Returns: {

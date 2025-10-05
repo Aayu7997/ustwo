@@ -48,6 +48,7 @@ export const VideoCallOverlay: React.FC<VideoCallOverlayProps> = ({
     stream,
     remoteStream,
     connectionQuality,
+    startCall,
     endCall
   } = usePersistentWebRTC({ 
     roomId, 
@@ -55,6 +56,14 @@ export const VideoCallOverlay: React.FC<VideoCallOverlayProps> = ({
     enabled: isActive,
     quality
   });
+
+  // Start call when overlay becomes active
+  useEffect(() => {
+    if (isActive && connectionState === 'idle') {
+      console.log('[VideoCallOverlay] Starting call...');
+      startCall();
+    }
+  }, [isActive, connectionState, startCall]);
 
   const handleEndCall = () => {
     endCall();
