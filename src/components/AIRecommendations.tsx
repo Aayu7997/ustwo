@@ -101,15 +101,6 @@ export const AIRecommendations: React.FC<AIRecommendationsProps> = ({
       return;
     }
 
-    if (!userPreferences && mode === 'solo') {
-      toast({
-        title: "Preferences Missing",
-        description: "Please set up your preferences first",
-        variant: "destructive"
-      });
-      return;
-    }
-
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('ai-recommendations', {
