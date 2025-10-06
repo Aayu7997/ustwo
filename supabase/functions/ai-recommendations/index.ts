@@ -61,6 +61,7 @@ serve(async (req) => {
     }
 
     console.log(`Generating AI recommendations for room: ${roomId} (mode: ${mode})`)
+    console.log('Using model: deepseek/deepseek-chat-v3.1:free')
 
     const prompt = mode === 'solo' 
       ? `
@@ -130,11 +131,11 @@ Focus on finding the perfect balance between both users' preferences. If they ha
         'X-Title': 'UsTwo'
       },
       body: JSON.stringify({
-        model: 'anthropic/claude-3.5-sonnet-20241022',
+        model: 'deepseek/deepseek-chat-v3.1:free',
         messages: [
           {
             role: 'system',
-            content: 'You are an expert entertainment curator who specializes in finding the perfect movies and shows for couples based on their individual preferences. Always respond with valid JSON only.'
+            content: 'You are an expert entertainment curator. You MUST respond with ONLY a valid JSON array, no additional text or explanation. Start your response with [ and end with ]. No markdown, no code blocks, just pure JSON.'
           },
           {
             role: 'user',
@@ -155,10 +156,26 @@ Focus on finding the perfect balance between both users' preferences. If they ha
     
     console.log('Raw AI response:', content)
     
-    // Parse the AI response
+    // Parse the AI response with robust handling for DeepSeek
     let recommendations: Recommendation[]
     try {
-      recommendations = JSON.parse(content)
+      let jsonContent = content.trim()
+      
+      // Remove markdown code blocks if present
+      if (jsonContent.includes('```')) {
+        const match = jsonContent.match(/```(?:json)?\s*([\s\S]*?)\s*```/)
+        if (match) {
+          jsonContent = match[1]
+        }
+      }
+      
+      // Extract JSON array if embedded in text
+      const arrayMatch = jsonContent.match(/\[[\s\S]*\]/)
+      if (arrayMatch) {
+        jsonContent = arrayMatch[0]
+      }
+      
+      recommendations = JSON.parse(jsonContent)
     } catch (parseError) {
       console.error('Failed to parse AI response:', parseError)
       // Fallback recommendations if AI response is malformed
