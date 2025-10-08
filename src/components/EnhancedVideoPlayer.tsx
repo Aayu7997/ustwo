@@ -74,6 +74,7 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
   const [videoSrc, setVideoSrc] = useState('');
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [youtubeVideoId, setYoutubeVideoId] = useState<string | null>(null);
+  const [vimeoUrl, setVimeoUrl] = useState('');
   const [directUrl, setDirectUrl] = useState('');
   const [currentFile, setCurrentFile] = useState<File | null>(null);
   const [currentMediaType, setCurrentMediaType] = useState<'local' | 'url' | 'youtube' | 'vimeo' | 'hls' | 'torrent'>('local');
@@ -472,9 +473,19 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
               crossOrigin="anonymous"
               onError={(e) => {
                 console.error('Video playback error:', e);
+                // Only show an error if a source was actually set
+                if (!videoSrc) return;
+                const err = (e.currentTarget as HTMLVideoElement)?.error;
+                const code = err?.code;
+                const messages: Record<number, string> = {
+                  1: 'Video loading aborted',
+                  2: 'Network error while fetching video',
+                  3: 'Video decoding failed or unsupported format',
+                  4: 'Video source not found'
+                };
                 toast({
                   title: "Playback Error",
-                  description: "Failed to load video. Check URL or format.",
+                  description: messages[code ?? 0] || "Failed to load video. Check URL or format.",
                   variant: "destructive"
                 });
               }}
@@ -654,11 +665,11 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
 
             <TabsContent value="url" className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="direct-url">Video URL (MP4, WebM, HLS)</Label>
+                <Label htmlFor="direct-url">Video URL (Vimeo, MP4, WebM, HLS)</Label>
                 <Input
                   id="direct-url"
                   type="url"
-                  placeholder="https://example.com/video.mp4"
+                  placeholder="https://vimeo.com/123456789 or https://example.com/video.m3u8"
                   value={directUrl}
                   onChange={(e) => setDirectUrl(e.target.value)}
                 />

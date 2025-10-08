@@ -55,6 +55,17 @@ export const SharedCalendar: React.FC<SharedCalendarProps> = ({ partnerId }) => 
     return events.filter(event => new Date(event.start_time) > now);
   };
 
+  const buildGoogleCalendarUrl = (event: any) => {
+    const fmt = (d: string) => new Date(d).toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+    const dates = `${fmt(event.start_time)}/${fmt(event.end_time)}`;
+    const params = new URLSearchParams({
+      text: event.title,
+      details: event.description || '',
+      dates
+    });
+    return `https://calendar.google.com/calendar/u/0/r/eventedit?${params.toString()}`;
+  };
+
   const getPastEvents = () => {
     const now = new Date();
     return events.filter(event => new Date(event.start_time) <= now);
@@ -156,7 +167,7 @@ export const SharedCalendar: React.FC<SharedCalendarProps> = ({ partnerId }) => 
                           transition={{ delay: index * 0.1 }}
                           className="p-4 bg-gradient-to-r from-pink-50 to-purple-50 dark:from-pink-900/20 dark:to-purple-900/20 rounded-lg border border-pink-200 dark:border-pink-800"
                         >
-                          <div className="flex items-start justify-between">
+                          <div className="flex items-start justify-between gap-3">
                             <div className="space-y-1">
                               <h4 className="font-medium">{event.title}</h4>
                               {event.description && (
@@ -173,9 +184,17 @@ export const SharedCalendar: React.FC<SharedCalendarProps> = ({ partnerId }) => 
                                 </span>
                               </div>
                             </div>
-                            <Badge variant="outline" className="bg-pink-100 dark:bg-pink-900">
-                              Upcoming
-                            </Badge>
+                            <div className="flex flex-col items-end gap-2">
+                              <Badge variant="outline" className="bg-pink-100 dark:bg-pink-900">Upcoming</Badge>
+                              <a
+                                href={buildGoogleCalendarUrl(event)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs underline text-primary"
+                              >
+                                Add to Google Calendar
+                              </a>
+                            </div>
                           </div>
                         </motion.div>
                       );

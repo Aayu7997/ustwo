@@ -142,7 +142,7 @@ export const PreferencesSetup: React.FC<PreferencesSetupProps> = ({ onClose }) =
           platforms: preferences.platforms,
           disliked: preferences.disliked,
           updated_at: new Date().toISOString()
-        });
+        }, { onConflict: 'user_id' });
 
       if (error) throw error;
 
