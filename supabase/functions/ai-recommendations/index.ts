@@ -30,13 +30,13 @@ serve(async (req) => {
   }
 
   try {
-    const openRouterApiKey = Deno.env.get('OPENROUTER_API_KEY')
+    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY')
     
-    if (!openRouterApiKey) {
-      console.error('OpenRouter API key not found')
+    if (!lovableApiKey) {
+      console.error('Lovable API key not found')
       return new Response(
         JSON.stringify({ 
-          error: 'OpenRouter API key not configured. Please add OPENROUTER_API_KEY secret.' 
+          error: 'AI service not configured. Please contact support.' 
         }),
         {
           status: 500,
@@ -61,81 +61,75 @@ serve(async (req) => {
     }
 
     console.log(`Generating AI recommendations for room: ${roomId} (mode: ${mode})`)
-    console.log('Using model: deepseek/deepseek-chat-v3.1:free')
+    console.log('Using Gemini 2.5 Flash via Lovable AI Gateway')
 
     const prompt = mode === 'solo' 
       ? `
 Based on this user's movie/series/music preferences, suggest 5 diverse entertainment options they would enjoy:
 
 User Preferences:
-- Favorite Genres: ${userPreferences?.genres?.join(', ') || 'Not specified'}
-- Favorite Actors: ${userPreferences?.actors?.join(', ') || 'Not specified'}
-- Favorite Directors: ${userPreferences?.directors?.join(', ') || 'Not specified'}
-- Preferred Platforms: ${userPreferences?.platforms?.join(', ') || 'Netflix, Prime Video, YouTube'}
+- Favorite Genres: ${userPreferences?.genres?.join(', ') || 'Open to anything'}
+- Favorite Actors: ${userPreferences?.actors?.join(', ') || 'No specific preferences'}
+- Favorite Directors: ${userPreferences?.directors?.join(', ') || 'No specific preferences'}
+- Preferred Platforms: ${userPreferences?.platforms?.join(', ') || 'Netflix, Prime Video, Disney+, YouTube'}
 - Dislikes: ${userPreferences?.disliked?.join(', ') || 'None specified'}
 
-Please suggest 5 movies/shows/documentaries they would enjoy on platforms like Netflix, Prime Video, Disney+, YouTube, HBO Max, or other streaming services.
+Please suggest 5 movies/shows/documentaries they would enjoy on streaming platforms.
 
-Respond ONLY with valid JSON in this exact format:
+Respond ONLY with valid JSON in this exact format (no markdown, no code blocks):
 [
   {
     "title": "Movie/Show Title",
-    "platform": "Netflix/Prime Video/Disney+/etc",
+    "platform": "Netflix/Prime Video/Disney+/YouTube/etc",
     "why_recommended": "Detailed explanation of why this matches the user's preferences",
     "genre": "Primary genre",
     "rating": "IMDb rating or critic score if known"
   }
 ]
-
-Focus on finding content that perfectly matches their stated preferences and interests.
 `
       : `
-Based on these two users' movie/series/music preferences, suggest 5 diverse entertainment options they can enjoy together:
+Based on these two users' preferences, suggest 5 entertainment options they can enjoy together:
 
 User A Preferences:
-- Favorite Genres: ${userPreferences?.genres?.join(', ') || 'Not specified'}
-- Favorite Actors: ${userPreferences?.actors?.join(', ') || 'Not specified'}
-- Favorite Directors: ${userPreferences?.directors?.join(', ') || 'Not specified'}
-- Preferred Platforms: ${userPreferences?.platforms?.join(', ') || 'Netflix, Prime Video, YouTube'}
+- Favorite Genres: ${userPreferences?.genres?.join(', ') || 'Open to anything'}
+- Favorite Actors: ${userPreferences?.actors?.join(', ') || 'No specific preferences'}
+- Favorite Directors: ${userPreferences?.directors?.join(', ') || 'No specific preferences'}
+- Preferred Platforms: ${userPreferences?.platforms?.join(', ') || 'Netflix, Prime Video, Disney+, YouTube'}
 - Dislikes: ${userPreferences?.disliked?.join(', ') || 'None specified'}
 
 User B Preferences:
-- Favorite Genres: ${partnerPreferences?.genres?.join(', ') || 'Not specified'}
-- Favorite Actors: ${partnerPreferences?.actors?.join(', ') || 'Not specified'}
-- Favorite Directors: ${partnerPreferences?.directors?.join(', ') || 'Not specified'}
-- Preferred Platforms: ${partnerPreferences?.platforms?.join(', ') || 'Netflix, Prime Video, YouTube'}
+- Favorite Genres: ${partnerPreferences?.genres?.join(', ') || 'Open to anything'}
+- Favorite Actors: ${partnerPreferences?.actors?.join(', ') || 'No specific preferences'}
+- Favorite Directors: ${partnerPreferences?.directors?.join(', ') || 'No specific preferences'}
+- Preferred Platforms: ${partnerPreferences?.platforms?.join(', ') || 'Netflix, Prime Video, Disney+, YouTube'}
 - Dislikes: ${partnerPreferences?.disliked?.join(', ') || 'None specified'}
 
-Please suggest 5 movies/shows/documentaries they can enjoy together on platforms like Netflix, Prime Video, Disney+, YouTube, HBO Max, or other streaming services.
+Please suggest 5 movies/shows they can enjoy together on streaming platforms.
 
-Respond ONLY with valid JSON in this exact format:
+Respond ONLY with valid JSON in this exact format (no markdown, no code blocks):
 [
   {
     "title": "Movie/Show Title",
-    "platform": "Netflix/Prime Video/Disney+/etc",
-    "why_recommended": "Detailed explanation of why this is perfect for both users based on their preferences",
+    "platform": "Netflix/Prime Video/Disney+/YouTube/etc",
+    "why_recommended": "Why this is perfect for both users",
     "genre": "Primary genre",
     "rating": "IMDb rating or critic score if known"
   }
 ]
-
-Focus on finding the perfect balance between both users' preferences. If they have conflicting tastes, suggest content that bridges their interests or alternates between their preferences.
 `;
 
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${openRouterApiKey}`,
+        'Authorization': `Bearer ${lovableApiKey}`,
         'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://ustwo.lovable.app',
-        'X-Title': 'UsTwo'
       },
       body: JSON.stringify({
-        model: 'deepseek/deepseek-chat-v3.1:free',
+        model: 'google/gemini-2.5-flash',
         messages: [
           {
             role: 'system',
-            content: 'You are an expert entertainment curator. You MUST respond with ONLY a valid JSON array, no additional text or explanation. Start your response with [ and end with ]. No markdown, no code blocks, just pure JSON.'
+            content: 'You are an expert entertainment curator. You MUST respond with ONLY a valid JSON array, no markdown, no code blocks, no additional text. Start with [ and end with ].'
           },
           {
             role: 'user',
@@ -148,15 +142,32 @@ Focus on finding the perfect balance between both users' preferences. If they ha
     })
 
     if (!response.ok) {
-      throw new Error(`OpenRouter API error: ${response.status} ${response.statusText}`)
+      const errorText = await response.text()
+      console.error('Lovable AI error:', response.status, errorText)
+      
+      if (response.status === 429) {
+        return new Response(
+          JSON.stringify({ error: 'AI service rate limit reached. Please try again in a moment.' }),
+          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+      
+      if (response.status === 402) {
+        return new Response(
+          JSON.stringify({ error: 'AI service quota exceeded. Please contact support.' }),
+          { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+      
+      throw new Error(`Lovable AI error: ${response.status} - ${errorText}`)
     }
 
     const data = await response.json()
     const content = data.choices[0].message.content
     
-    console.log('Raw AI response:', content)
+    console.log('Raw AI response:', content.substring(0, 200))
     
-    // Parse the AI response with robust handling for DeepSeek
+    // Parse the AI response with robust handling
     let recommendations: Recommendation[]
     try {
       let jsonContent = content.trim()
@@ -176,23 +187,53 @@ Focus on finding the perfect balance between both users' preferences. If they ha
       }
       
       recommendations = JSON.parse(jsonContent)
+      
+      // Validate recommendations format
+      if (!Array.isArray(recommendations) || recommendations.length === 0) {
+        throw new Error('Invalid recommendations format')
+      }
+      
+      console.log(`Successfully parsed ${recommendations.length} recommendations`)
     } catch (parseError) {
       console.error('Failed to parse AI response:', parseError)
-      // Fallback recommendations if AI response is malformed
+      console.error('Response content:', content)
+      
+      // Fallback recommendations
       recommendations = [
         {
-          title: "The Queen's Gambit",
+          title: "The Shawshank Redemption",
           platform: "Netflix",
-          why_recommended: "A captivating drama that appeals to both strategic thinkers and those who enjoy character development",
+          why_recommended: "A timeless classic about hope and friendship that appeals universally",
           genre: "Drama",
-          rating: "8.5/10"
+          rating: "9.3/10"
         },
         {
           title: "Avatar: The Last Airbender",
           platform: "Netflix",
-          why_recommended: "An animated series that combines adventure, humor, and deep storytelling that appeals to all ages",
+          why_recommended: "An animated series combining adventure, humor, and deep storytelling",
           genre: "Animation/Adventure",
           rating: "9.3/10"
+        },
+        {
+          title: "Inception",
+          platform: "Prime Video",
+          why_recommended: "Mind-bending thriller with stunning visuals and complex plot",
+          genre: "Sci-Fi/Thriller",
+          rating: "8.8/10"
+        },
+        {
+          title: "The Office",
+          platform: "Netflix",
+          why_recommended: "Hilarious workplace comedy perfect for binge-watching together",
+          genre: "Comedy",
+          rating: "9.0/10"
+        },
+        {
+          title: "Planet Earth II",
+          platform: "Netflix",
+          why_recommended: "Breathtaking nature documentary with stunning cinematography",
+          genre: "Documentary",
+          rating: "9.5/10"
         }
       ]
     }
@@ -220,7 +261,7 @@ Focus on finding the perfect balance between both users' preferences. If they ha
       .insert({
         room_id: roomId,
         user_id: userData.user.id,
-        partner_id: partnerId || userData.user.id, // Use user_id if no partner
+        partner_id: partnerId || userData.user.id,
         recommendations: recommendations
       })
 
@@ -235,7 +276,10 @@ Focus on finding the perfect balance between both users' preferences. If they ha
   } catch (error) {
     console.error('Error in ai-recommendations function:', error)
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error instanceof Error ? error.message : 'An unexpected error occurred',
+        details: 'Please try again or contact support if the issue persists'
+      }),
       {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

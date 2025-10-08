@@ -1,0 +1,77 @@
+{
+  "manifest_version": 3,
+  "name": "UsTwo - Watch Together",
+  "version": "1.0.0",
+  "description": "Sync video playback with your partner across Netflix, Prime Video, Hotstar, YouTube and more. Perfect for couples watching together remotely!",
+  "author": "UsTwo Team",
+  
+  "permissions": [
+    "activeTab",
+    "storage",
+    "tabs"
+  ],
+  
+  "host_permissions": [
+    "https://www.netflix.com/*",
+    "https://www.primevideo.com/*",
+    "https://www.hotstar.com/*",
+    "https://www.youtube.com/*",
+    "https://www.hulu.com/*",
+    "https://www.disneyplus.com/*",
+    "https://play.hbomax.com/*",
+    "https://www.crunchyroll.com/*",
+    "https://vimeo.com/*",
+    "https://mxatgocmnasozbkbjiuq.supabase.co/*"
+  ],
+  
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.netflix.com/*",
+        "https://www.primevideo.com/*", 
+        "https://www.hotstar.com/*",
+        "https://www.youtube.com/*",
+        "https://www.hulu.com/*",
+        "https://www.disneyplus.com/*",
+        "https://play.hbomax.com/*",
+        "https://www.crunchyroll.com/*",
+        "https://vimeo.com/*"
+      ],
+      "js": ["content-script.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "UsTwo - Watch Together",
+    "default_icon": {
+      "16": "icon-16.png",
+      "32": "icon-32.png", 
+      "48": "icon-48.png",
+      "128": "icon-128.png"
+    }
+  },
+  
+  "icons": {
+    "16": "icon-16.png",
+    "32": "icon-32.png",
+    "48": "icon-48.png", 
+    "128": "icon-128.png"
+  },
+  
+  "web_accessible_resources": [
+    {
+      "resources": ["popup.html", "popup.css", "icon-*.png"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+  
+  "minimum_chrome_version": "88"
+}

@@ -247,8 +247,18 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
     setIsLoading(true);
     
     try {
+      const urlToLoad = directUrl.trim();
+      
+      // Check URL format validity
+      let validUrl: URL;
+      try {
+        validUrl = new URL(urlToLoad.startsWith('http') ? urlToLoad : `https://${urlToLoad}`);
+      } catch (urlError) {
+        throw new Error('Invalid URL format. Please enter a valid URL.');
+      }
+      
       // Check if it's a Vimeo URL
-      const vimeoMatch = directUrl.match(/vimeo\.com\/(\d+)/);
+      const vimeoMatch = urlToLoad.match(/vimeo\.com\/(?:video\/)?(\d+)/);
       if (vimeoMatch) {
         setVideoSrc(vimeoMatch[1]);
         setCurrentMediaType('vimeo');
@@ -261,15 +271,34 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
       }
 
       // Check if it's an HLS stream
-      if (directUrl.includes('.m3u8')) {
+      if (urlToLoad.includes('.m3u8')) {
         if (Hls.isSupported()) {
           if (hlsRef.current) {
             hlsRef.current.destroy();
           }
           
-          hlsRef.current = new Hls();
-          hlsRef.current.loadSource(directUrl);
-          hlsRef.current.attachMedia(videoRef.current!);
+          hlsRef.current = new Hls({
+            maxBufferLength: 30,
+            maxMaxBufferLength: 600,
+            enableWorker: true,
+            lowLatencyMode: true,
+          });
+          
+          hlsRef.current.on(Hls.Events.ERROR, (event, data) => {
+            console.error('HLS Error:', data);
+            if (data.fatal) {
+              toast({
+                title: "Stream Error",
+                description: "Failed to load HLS stream. Please check the URL.",
+                variant: "destructive"
+              });
+            }
+          });
+          
+          hlsRef.current.loadSource(urlToLoad);
+          if (videoRef.current) {
+            hlsRef.current.attachMedia(videoRef.current);
+          }
           
           setCurrentMediaType('hls');
           toast({
@@ -279,25 +308,31 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
         } else {
           toast({
             title: "HLS Not Supported",
-            description: "Your browser doesn't support HLS streaming",
+            description: "Your browser doesn't support HLS streaming. Try Chrome or Safari.",
             variant: "destructive"
           });
         }
-      } else {
-        // Regular video URL
-        setVideoSrc(directUrl);
+      } else if (urlToLoad.match(/\.(mp4|webm|ogg|mov)$/i)) {
+        // Direct video file
+        setVideoSrc(urlToLoad);
         setCurrentMediaType('url');
         
         toast({
           title: "Video URL Loaded! 🎬",
           description: "Video is ready to play"
         });
+      } else {
+        toast({
+          title: "Unsupported Format",
+          description: "Please provide a direct video URL (.mp4, .webm, .ogg) or HLS stream (.m3u8)",
+          variant: "destructive"
+        });
       }
     } catch (error) {
       console.error('Error loading video URL:', error);
       toast({
         title: "Loading Error",
-        description: "Failed to load video. Please check the URL.",
+        description: error instanceof Error ? error.message : "Failed to load video. Please check the URL format.",
         variant: "destructive"
       });
     } finally {
