@@ -93,7 +93,7 @@ class VideoPlayerController {
   }
 
   detectYouTube() {
-    const video = document.querySelector('video.html5-video-player, #movie_player video');
+    const video = document.querySelector('#movie_player video, video');
     if (video) {
       this.setupPlayer(video, 'YouTube', {
         playButton: '.ytp-play-button',
@@ -148,6 +148,7 @@ class VideoPlayerController {
     
     console.log(`✅ ${platform} player detected!`);
     this.currentPlayer = videoElement;
+    this.platform = platform; // track for state reporting
     
     // Send platform info to background
     chrome.runtime.sendMessage({
@@ -159,6 +160,14 @@ class VideoPlayerController {
     
     // Setup event listeners
     this.setupVideoEventListeners(videoElement);
+    
+    // Bridge: notify page the extension is active on this site
+    try {
+      window.postMessage({
+        type: 'USTW_EXTENSION_STATUS',
+        data: { connected: true, site: platform }
+      }, '*');
+    } catch (e) { /* no-op */ }
     
     // Create floating sync button
     this.createSyncButton(platform);
@@ -328,7 +337,7 @@ class VideoPlayerController {
         position: fixed;
         top: 20px;
         right: 20px;
-        z-index: 999999;
+        z-index: 2147483647;
         background: linear-gradient(135deg, #ec4899, #8b5cf6);
         color: white;
         padding: 12px 16px;
@@ -344,7 +353,7 @@ class VideoPlayerController {
         display: flex;
         align-items: center;
         gap: 8px;
-      " onclick="chrome.runtime.sendMessage({type: 'OPEN_POPUP'})">
+      " id="ustoo-sync-button-inner">
         <span style="font-size: 16px;">💕</span>
         <span>UsTwo Sync</span>
         <span style="font-size: 10px; opacity: 0.8;">${platform}</span>
@@ -353,8 +362,10 @@ class VideoPlayerController {
     
     document.body.appendChild(button);
     
-    // Add hover effects
-    const syncButton = button.firstElementChild;
+    // Add hover and click effects
+    const syncButton = document.getElementById('ustoo-sync-button-inner');
+    if (!syncButton) return;
+    
     syncButton.addEventListener('mouseenter', () => {
       syncButton.style.transform = 'translateY(-2px)';
       syncButton.style.boxShadow = '0 12px 40px rgba(0,0,0,0.4)';
@@ -363,6 +374,14 @@ class VideoPlayerController {
     syncButton.addEventListener('mouseleave', () => {
       syncButton.style.transform = 'translateY(0)';
       syncButton.style.boxShadow = '0 8px 32px rgba(0,0,0,0.3)';
+    });
+    
+    syncButton.addEventListener('click', () => {
+      chrome.runtime.sendMessage({ type: 'OPEN_POPUP' });
+      // Also notify page to help web app bridge
+      try {
+        window.postMessage({ type: 'USTW_EXTENSION_STATUS', data: { connected: true, site: platform } }, '*');
+      } catch (e) { /* ignore */ }
     });
   }
 
@@ -418,6 +437,42 @@ class VideoPlayerController {
     }, 3000);
   }
 }
+
+// Bridge: listen to page messages (ExtensionBridge)
+window.addEventListener('message', (event) => {
+  if (event.source !== window || !event.data) return;
+  const { type, data } = event.data;
+  if (type === 'USTW_CONNECT_ROOM') {
+    // Forward to background (requires user to be signed in via popup)
+    chrome.storage.local.get(['userSession'], (res) => {
+      chrome.runtime.sendMessage({ type: 'JOIN_ROOM', roomCode: data.roomCode, userSession: res.userSession }, () => {});
+    });
+  }
+  if (type === 'USTW_PLAYER_COMMAND') {
+    if (!document || !document.querySelector) return;
+    const video = document.querySelector('video');
+    if (!video) return;
+    if (data.command === 'play') video.play();
+    if (data.command === 'pause') video.pause();
+  }
+});
+
+// Periodically post player state back to page
+setInterval(() => {
+  const video = document.querySelector('video');
+  if (!video) return;
+  try {
+    window.postMessage({
+      type: 'USTW_PLAYER_STATE',
+      data: {
+        isPlaying: !video.paused,
+        currentTime: video.currentTime,
+        duration: video.duration,
+        title: document.title
+      }
+    }, '*');
+  } catch (e) { /* ignore */ }
+}, 2000);
 
 // Initialize the controller
 new VideoPlayerController();

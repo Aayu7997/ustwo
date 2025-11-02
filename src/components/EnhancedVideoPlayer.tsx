@@ -271,11 +271,18 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
         return;
       }
 
-      // Check if it's an HLS stream
-      if (urlToLoad.includes('.m3u8')) {
+      // YouTube links
+      const ytId = extractYouTubeId(urlToLoad);
+      if (ytId) {
+        setYoutubeVideoId(ytId);
+        setCurrentMediaType('youtube');
+        setVideoSrc('');
+        toast({ title: 'YouTube Video Loaded! 📺', description: 'YouTube video is ready to play' });
+      } else if (urlToLoad.includes('.m3u8')) {
+        // HLS stream
         if (Hls.isSupported()) {
           if (hlsRef.current) {
-            hlsRef.current.destroy();
+            try { hlsRef.current.destroy(); } catch {}
           }
           
           hlsRef.current = new Hls({
@@ -289,9 +296,9 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
             console.error('HLS Error:', data);
             if (data.fatal) {
               toast({
-                title: "Stream Error",
-                description: "Failed to load HLS stream. Please check the URL.",
-                variant: "destructive"
+                title: 'Stream Error',
+                description: 'Failed to load HLS stream. Please check the URL.',
+                variant: 'destructive'
               });
             }
           });
@@ -302,32 +309,20 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
           }
           
           setCurrentMediaType('hls');
-          toast({
-            title: "HLS Stream Loaded! 📺",
-            description: "Live stream is ready to play"
-          });
+          setVideoSrc('');
+          toast({ title: 'HLS Stream Loaded! 📺', description: 'Live stream is ready to play' });
         } else {
-          toast({
-            title: "HLS Not Supported",
-            description: "Your browser doesn't support HLS streaming. Try Chrome or Safari.",
-            variant: "destructive"
-          });
+          toast({ title: 'HLS Not Supported', description: "Your browser doesn't support HLS streaming. Try Chrome or Safari.", variant: 'destructive' });
         }
       } else if (urlToLoad.match(/\.(mp4|webm|ogg|mov)$/i)) {
         // Direct video file
+        if (hlsRef.current) { try { hlsRef.current.destroy(); } catch {} hlsRef.current = null; }
+        setYoutubeVideoId(null);
         setVideoSrc(urlToLoad);
         setCurrentMediaType('url');
-        
-        toast({
-          title: "Video URL Loaded! 🎬",
-          description: "Video is ready to play"
-        });
+        toast({ title: 'Video URL Loaded! 🎬', description: 'Video is ready to play' });
       } else {
-        toast({
-          title: "Unsupported Format",
-          description: "Please provide a direct video URL (.mp4, .webm, .ogg) or HLS stream (.m3u8)",
-          variant: "destructive"
-        });
+        toast({ title: 'Unsupported Format', description: 'Please provide a direct video URL (.mp4, .webm, .ogg), HLS (.m3u8), YouTube or Vimeo link', variant: 'destructive' });
       }
     } catch (error) {
       console.error('Error loading video URL:', error);
@@ -471,9 +466,10 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
               controls={false}
               playsInline
               crossOrigin="anonymous"
+              preload="metadata"
               onError={(e) => {
                 console.error('Video playback error:', e);
-                // Only show an error if a source was actually set
+                if (hlsRef.current) { try { hlsRef.current.destroy(); } catch {} hlsRef.current = null; }
                 if (!videoSrc) return;
                 const err = (e.currentTarget as HTMLVideoElement)?.error;
                 const code = err?.code;
@@ -484,9 +480,9 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
                   4: 'Video source not found'
                 };
                 toast({
-                  title: "Playback Error",
-                  description: messages[code ?? 0] || "Failed to load video. Check URL or format.",
-                  variant: "destructive"
+                  title: 'Playback Error',
+                  description: messages[code ?? 0] || 'Failed to load video. Check URL or format.',
+                  variant: 'destructive'
                 });
               }}
             />

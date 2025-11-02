@@ -38,10 +38,10 @@ export const AIRecommendations: React.FC<AIRecommendationsProps> = ({
   // Fetch user preferences
   useEffect(() => {
     const fetchPreferences = async () => {
-      if (!user || !partnerId) return;
+      if (!user) return;
 
       try {
-        // Fetch current user preferences
+        // Fetch current user preferences (always)
         const { data: userPref, error: userError } = await supabase
           .from('preferences')
           .select('*')
@@ -51,15 +51,17 @@ export const AIRecommendations: React.FC<AIRecommendationsProps> = ({
         if (userError) throw userError;
         setUserPreferences(userPref);
 
-        // Fetch partner preferences
-        const { data: partnerPref, error: partnerError } = await supabase
-          .from('preferences')
-          .select('*')
-          .eq('user_id', partnerId)
-          .maybeSingle();
+        // Fetch partner preferences only when available
+        if (partnerId) {
+          const { data: partnerPref, error: partnerError } = await supabase
+            .from('preferences')
+            .select('*')
+            .eq('user_id', partnerId)
+            .maybeSingle();
 
-        if (partnerError) throw partnerError;
-        setPartnerPreferences(partnerPref);
+          if (partnerError) throw partnerError;
+          setPartnerPreferences(partnerPref);
+        }
 
         // Load existing recommendations
         const { data: existingRecs, error: recsError } = await supabase
@@ -115,13 +117,15 @@ export const AIRecommendations: React.FC<AIRecommendationsProps> = ({
 
       if (error) throw error;
 
-      setRecommendations(data.recommendations);
+      // De-duplicate by title to avoid repeats
+      const unique = Array.from(new Map(((data.recommendations || []) as Recommendation[]).map((r: Recommendation) => [r.title.toLowerCase(), r])).values());
+      setRecommendations(unique as Recommendation[]);
       setShowRecommendations(true);
       
       const modeText = mode === 'couple' ? 'for you and your partner' : 'just for you';
       toast({
         title: "AI Magic! ✨",
-        description: `Generated ${data.recommendations.length} personalized recommendations ${modeText}!`
+        description: `Generated ${unique.length} personalized recommendations ${modeText}!`
       });
     } catch (error: any) {
       console.error('Error generating recommendations:', error);

@@ -91,6 +91,10 @@ class RoomSyncManager {
           chrome.action.openPopup();
           sendResponse({ success: true });
           break;
+        
+        case 'PING':
+          sendResponse({ connected: !!this.websocket, room: this.currentRoom?.room_code || null });
+          break;
           
         default:
           sendResponse({ error: 'Unknown message type' });
@@ -255,8 +259,8 @@ class RoomSyncManager {
     }
     
     try {
-      // Connect to Supabase realtime WebSocket
-      const wsUrl = `wss://mxatgocmnasozbkbjiuq.supabase.co/realtime/v1/websocket?access_token=${userSession.access_token}&apikey=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im14YXRnb2NtbmFzb3pia2JqaXVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM4MDA5MzgsImV4cCI6MjA2OTM3NjkzOH0.ijTHgUylTxN--454y2iN29lQpnydXvNGA2wfuDDZp1Q`;
+      // Connect to Supabase realtime WebSocket (Phoenix protocol)
+      const wsUrl = `wss://mxatgocmnasozbkbjiuq.supabase.co/realtime/v1/websocket?apikey=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im14YXRnb2NtbmFzb3pia2JqaXVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM4MDA5MzgsImV4cCI6MjA2OTM3NjkzOH0.ijTHgUylTxN--454y2iN29lQ&vsn=1.0.0`;
       
       this.websocket = new WebSocket(wsUrl);
       
@@ -264,15 +268,8 @@ class RoomSyncManager {
         console.log('✅ WebSocket connected');
         this.syncEnabled = true;
         
-        // Join the room channel
-        this.websocket.send(JSON.stringify({
-          topic: `room:${room.id}`,
-          event: 'phx_join',
-          payload: {},
-          ref: Date.now()
-        }));
-        
-        // Setup heartbeat
+        // Authenticate and join broadcast channel per room code
+        this.websocket.send(JSON.stringify({ topic: 'realtime:public:rtc_signaling', event: 'phx_join', payload: {}, ref: Date.now() }));
         this.startHeartbeat();
       };
       
@@ -284,13 +281,7 @@ class RoomSyncManager {
         console.log('🔌 WebSocket disconnected');
         this.syncEnabled = false;
         this.stopHeartbeat();
-        
-        // Attempt reconnection
-        setTimeout(() => {
-          if (this.currentRoom) {
-            this.connectToRoom(this.currentRoom, userSession);
-          }
-        }, 5000);
+        setTimeout(() => { if (this.currentRoom) { this.connectToRoom(this.currentRoom, userSession); } }, 5000);
       };
       
     } catch (error) {
@@ -299,19 +290,14 @@ class RoomSyncManager {
   }
 
   handleWebSocketMessage(data) {
-    if (data.event === 'broadcast' && data.payload.event === 'playback_sync') {
-      const syncData = data.payload.payload;
-      
-      // Don't sync our own events
-      if (syncData.user_id === this.currentRoom?.created_by) return;
-      
-      console.log('📥 Received sync event:', syncData.action);
-      
-      // Send to content script for playback control
-      this.sendToContentScript({
-        type: 'SYNC_PLAYBACK',
-        data: syncData
-      });
+    try {
+      if (data.event === 'broadcast' && data.payload?.event === 'playback_sync') {
+        const syncData = data.payload.payload;
+        console.log('📥 Received sync event:', syncData?.action);
+        this.sendToContentScript({ type: 'SYNC_PLAYBACK', data: syncData });
+      }
+    } catch (e) {
+      console.error('WS message handling error', e);
     }
   }
 

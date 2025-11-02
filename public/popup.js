@@ -321,8 +321,9 @@ class PopupManager {
   }
 
   openWebApp() {
+    // Open the app's sign-in page so the extension can use your session
     chrome.tabs.create({
-      url: 'https://mxatgocmnasozbkbjiuq.supabase.co/auth'
+      url: 'https://8f0d288f-f962-4e64-8c48-4ba23504db46.lovableproject.com/auth'
     });
   }
 

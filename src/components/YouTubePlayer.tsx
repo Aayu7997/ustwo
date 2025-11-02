@@ -23,19 +23,32 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
   const [apiLoaded, setApiLoaded] = useState(false);
 
   useEffect(() => {
-    // Load YouTube IFrame API
-    if (!window.YT) {
-      const script = document.createElement('script');
-      script.src = 'https://www.youtube.com/iframe_api';
-      script.async = true;
-      document.body.appendChild(script);
+    // Load YouTube IFrame API safely
+    const ensureApiReady = () => {
+      if (window.YT && typeof window.YT.Player === 'function') {
+        setApiLoaded(true);
+        return true;
+      }
+      return false;
+    };
 
+    if (!ensureApiReady()) {
+      // Inject script only once
+      if (!document.getElementById('youtube-iframe-api')) {
+        const script = document.createElement('script');
+        script.id = 'youtube-iframe-api';
+        script.src = 'https://www.youtube.com/iframe_api';
+        script.async = true;
+        document.body.appendChild(script);
+      }
+
+      // Define or wrap global callback
+      const previous = window.onYouTubeIframeAPIReady;
       window.onYouTubeIframeAPIReady = () => {
         console.log('YouTube API ready');
         setApiLoaded(true);
+        previous?.();
       };
-    } else {
-      setApiLoaded(true);
     }
 
     return () => {
@@ -63,7 +76,7 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
           autoplay: 0,
           controls: 1,
           enablejsapi: 1,
-          origin: window.location.origin,
+          // origin intentionally omitted to avoid cross-origin strictness in preview iframes
           rel: 0,
           showinfo: 0,
           modestbranding: 1
@@ -182,6 +195,7 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
             ref={containerRef}
             className={`w-full ${!apiLoaded ? 'hidden' : ''}`}
             style={{ aspectRatio: '16/9' }}
+            aria-label="YouTube player container"
           />
         </div>
         
