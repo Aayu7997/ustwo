@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
+import Player from '@vimeo/player';
 import { Card, CardContent } from '@/components/ui/card';
+import { toast } from '@/hooks/use-toast';
 
 interface VimeoPlayerProps {
   videoId: string;
@@ -92,6 +94,25 @@ export const VimeoPlayer: React.FC<VimeoPlayerProps> = ({
 
       playerRef.current.on('error', (error: any) => {
         console.error('Vimeo player error:', error);
+        toast({
+          title: "Vimeo Playback Error",
+          description: error.message || "Failed to load Vimeo video. The video may be private or restricted.",
+          variant: "destructive"
+        });
+      });
+
+      // Additional features
+      playerRef.current.on('timeupdate', async (data: any) => {
+        if (data.seconds) {
+          onPlaybackUpdate?.(data.seconds, true);
+        }
+      });
+
+      playerRef.current.on('loaded', () => {
+        toast({
+          title: "Vimeo Video Loaded",
+          description: "Video is ready to play"
+        });
       });
 
     } catch (error) {

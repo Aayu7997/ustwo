@@ -31,12 +31,12 @@ export const WatchPartyEffects: React.FC<WatchPartyEffectsProps> = ({
   const lastTimeRef = useRef(currentTime);
   const effectCounterRef = useRef(0);
 
-  // Welcome effect when partner joins
+  // Welcome effect when partner joins - reduced duration and made less intrusive
   useEffect(() => {
     if (partnerJoined) {
       setShowWelcomeBurst(true);
       generateParticles('celebration', 15);
-      setTimeout(() => setShowWelcomeBurst(false), 3000);
+      setTimeout(() => setShowWelcomeBurst(false), 1500); // Reduced from 3000 to 1500ms
     }
   }, [partnerJoined]);
 
@@ -128,26 +128,28 @@ export const WatchPartyEffects: React.FC<WatchPartyEffectsProps> = ({
 
   return (
     <div className="fixed inset-0 pointer-events-none z-40 overflow-hidden">
-      {/* Welcome Burst Effect */}
+      {/* Welcome Burst Effect - Non-blocking notification */}
       <AnimatePresence>
         {showWelcomeBurst && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.5 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.5 }}
-            className="absolute inset-0 flex items-center justify-center"
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="absolute top-20 left-1/2 transform -translate-x-1/2 z-50"
           >
             <motion.div
-              initial={{ scale: 0.5, opacity: 0 }}
-              animate={{ scale: [0.5, 1.2, 1], opacity: [0, 1, 0] }}
-              transition={{ duration: 2 }}
-              className="text-center"
+              initial={{ scale: 0.8 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.8 }}
+              transition={{ duration: 0.3 }}
+              className="bg-primary/95 text-primary-foreground px-6 py-3 rounded-lg shadow-xl backdrop-blur-sm"
             >
-              <div className="text-4xl font-bold text-primary mb-2">
-                🎉 Partner Joined! 🎉
-              </div>
-              <div className="text-xl text-muted-foreground">
-                Let's watch together!
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">🎉</span>
+                <div>
+                  <div className="font-bold text-lg">Partner Joined!</div>
+                  <div className="text-sm opacity-90">Let's watch together!</div>
+                </div>
               </div>
             </motion.div>
           </motion.div>

@@ -30,10 +30,10 @@ serve(async (req) => {
   }
 
   try {
-    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY')
+    const openRouterApiKey = Deno.env.get('OPENROUTER_API_KEY')
     
-    if (!lovableApiKey) {
-      console.error('Lovable API key not found')
+    if (!openRouterApiKey) {
+      console.error('OpenRouter API key not found')
       return new Response(
         JSON.stringify({ 
           error: 'AI service not configured. Please contact support.' 
@@ -61,7 +61,7 @@ serve(async (req) => {
     }
 
     console.log(`Generating AI recommendations for room: ${roomId} (mode: ${mode})`)
-    console.log('Using Gemini 2.5 Flash via Lovable AI Gateway')
+    console.log('Using DeepSeek V3.1 (free) via OpenRouter')
 
     const prompt = mode === 'solo' 
       ? `
@@ -118,14 +118,16 @@ Respond ONLY with valid JSON in this exact format (no markdown, no code blocks):
 ]
 `;
 
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${lovableApiKey}`,
+        'Authorization': `Bearer ${openRouterApiKey}`,
         'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://lovable.app',
+        'X-Title': 'Watch Together App'
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: 'deepseek/deepseek-chat',
         messages: [
           {
             role: 'system',
@@ -143,7 +145,7 @@ Respond ONLY with valid JSON in this exact format (no markdown, no code blocks):
 
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('Lovable AI error:', response.status, errorText)
+      console.error('OpenRouter AI error:', response.status, errorText)
       
       if (response.status === 429) {
         return new Response(
@@ -154,12 +156,12 @@ Respond ONLY with valid JSON in this exact format (no markdown, no code blocks):
       
       if (response.status === 402) {
         return new Response(
-          JSON.stringify({ error: 'AI service quota exceeded. Please contact support.' }),
+          JSON.stringify({ error: 'AI service quota exceeded. Please add credits to your account.' }),
           { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
       
-      throw new Error(`Lovable AI error: ${response.status} - ${errorText}`)
+      throw new Error(`OpenRouter AI error: ${response.status} - ${errorText}`)
     }
 
     const data = await response.json()

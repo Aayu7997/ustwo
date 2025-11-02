@@ -6,6 +6,7 @@ import { useVideoQuality } from '@/hooks/useVideoQuality';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { toast } from '@/hooks/use-toast';
 import { 
   Video, 
   VideoOff, 
@@ -61,7 +62,19 @@ export const VideoCallOverlay: React.FC<VideoCallOverlayProps> = ({
   useEffect(() => {
     if (isActive && connectionState === 'idle') {
       console.log('[VideoCallOverlay] Starting call...');
-      startCall();
+      // Add a small delay to ensure UI is ready
+      const timer = setTimeout(() => {
+        startCall().catch(err => {
+          console.error('[VideoCallOverlay] Failed to start call:', err);
+          toast({
+            title: "Failed to Start Call",
+            description: "Please check your camera and microphone permissions",
+            variant: "destructive"
+          });
+        });
+      }, 300);
+      
+      return () => clearTimeout(timer);
     }
   }, [isActive, connectionState, startCall]);
 
@@ -235,29 +248,40 @@ export const VideoCallOverlay: React.FC<VideoCallOverlayProps> = ({
               </div>
 
               {/* Remote video (partner) */}
-              <video
-                ref={remoteVideoRef}
-                autoPlay
-                playsInline
-                className={cn(
-                  "w-full h-full object-cover",
-                  !remoteStream && "hidden"
-                )}
-              />
-
-              {/* Local video (self) - Small overlay */}
-              <div className="absolute top-2 right-2 w-16 h-12 rounded overflow-hidden border-2 border-white/50">
+              <div className="w-full h-full bg-gray-900">
                 <video
-                  ref={localVideoRef}
+                  ref={remoteVideoRef}
                   autoPlay
                   playsInline
-                  muted
                   className={cn(
                     "w-full h-full object-cover",
-                    !stream && "hidden"
+                    !remoteStream && "hidden"
                   )}
                 />
+                
+                {/* No remote stream placeholder */}
+                {!remoteStream && !isLoading && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
+                    <div className="text-center text-white space-y-2">
+                      <Video className="w-12 h-12 mx-auto opacity-50" />
+                      <p className="text-sm opacity-75">Waiting for partner to join...</p>
+                    </div>
+                  </div>
+                )}
               </div>
+
+              {/* Local video (self) - Small overlay */}
+              {stream && (
+                <div className="absolute top-2 right-2 w-16 h-12 rounded overflow-hidden border-2 border-white/50 bg-gray-900">
+                  <video
+                    ref={localVideoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              )}
 
               {/* Loading/Connection Status */}
               {(isLoading || isFailed) && (
