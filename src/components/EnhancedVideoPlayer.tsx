@@ -83,14 +83,15 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
   const [enableP2P, setEnableP2P] = useState(true);
   const [enableSync, setEnableSync] = useState(true);
 
-  // YouTube controls bridge
+  // YouTube/Vimeo controls bridge
   const ytControlsRef = useRef<{ play: () => void; pause: () => void; seekTo: (s: number) => void; getCurrentTime: () => number; getPlayerState: () => any } | null>(null);
+  const vimeoControlsRef = useRef<{ play: () => void; pause: () => void; seekTo: (s: number) => void; getCurrentTime: () => Promise<number>; getPaused: () => Promise<boolean> } | null>(null);
 
   // Realtime sync: listen and act on partner updates
   const { sendPlaybackUpdate, sendSyncEvent } = useRealtimeSync({
     roomId,
     onPlaybackUpdate: () => {},
-    onMediaSync: (syncTime: number, syncPlaying: boolean) => {
+    onMediaSync: async (syncTime: number, syncPlaying: boolean) => {
       // Apply to active player
       if (currentMediaType === 'youtube' && ytControlsRef.current) {
         const cur = ytControlsRef.current.getCurrentTime?.() ?? 0;
@@ -99,6 +100,14 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
         }
         if (syncPlaying) ytControlsRef.current.play();
         else ytControlsRef.current.pause();
+      } else if (currentMediaType === 'vimeo' && vimeoControlsRef.current) {
+        const cur = await vimeoControlsRef.current.getCurrentTime?.() ?? 0;
+        if (Math.abs(cur - syncTime) > 0.7) {
+          vimeoControlsRef.current.seekTo(syncTime);
+        }
+        const isPaused = await vimeoControlsRef.current.getPaused?.() ?? true;
+        if (syncPlaying && isPaused) vimeoControlsRef.current.play();
+        else if (!syncPlaying && !isPaused) vimeoControlsRef.current.pause();
       } else if (videoRef.current) {
         if (Math.abs(videoRef.current.currentTime - syncTime) > 0.7) {
           videoRef.current.currentTime = syncTime;
@@ -165,6 +174,11 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
       else ytControlsRef.current.play();
       return;
     }
+    if (currentMediaType === 'vimeo' && vimeoControlsRef.current) {
+      if (isPlaying) vimeoControlsRef.current.pause();
+      else vimeoControlsRef.current.play();
+      return;
+    }
     if (!videoRef.current) return;
     if (isPlaying) videoRef.current.pause();
     else void videoRef.current.play();
@@ -174,6 +188,8 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
     const time = (value[0] / 100) * (duration || 0);
     if (currentMediaType === 'youtube' && ytControlsRef.current) {
       ytControlsRef.current.seekTo(time);
+    } else if (currentMediaType === 'vimeo' && vimeoControlsRef.current) {
+      vimeoControlsRef.current.seekTo(time);
     } else if (videoRef.current) {
       videoRef.current.currentTime = time;
     }
@@ -477,6 +493,8 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
                     sendPlaybackUpdate(time, playing);
                   }
                 }}
+                onDurationChange={(d) => setDuration(d)}
+                onReadyControls={(api) => { vimeoControlsRef.current = api; }}
               />
             </div>
           ) : (

@@ -6,6 +6,8 @@ import { toast } from '@/hooks/use-toast';
 interface VimeoPlayerProps {
   videoId: string;
   onPlaybackUpdate?: (currentTime: number, isPlaying: boolean) => void;
+  onDurationChange?: (duration: number) => void;
+  onReadyControls?: (controls: { play: () => void; pause: () => void; seekTo: (s: number) => void; getCurrentTime: () => Promise<number>; getPaused: () => Promise<boolean> }) => void;
 }
 
 declare global {
@@ -16,7 +18,9 @@ declare global {
 
 export const VimeoPlayer: React.FC<VimeoPlayerProps> = ({
   videoId,
-  onPlaybackUpdate
+  onPlaybackUpdate,
+  onDurationChange,
+  onReadyControls
 }) => {
   const playerRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -68,9 +72,22 @@ export const VimeoPlayer: React.FC<VimeoPlayerProps> = ({
 
       playerRef.current = new window.Vimeo.Player(iframe);
 
-      playerRef.current.ready().then(() => {
+      playerRef.current.ready().then(async () => {
         console.log('Vimeo player ready');
         setIsReady(true);
+        
+        // Get and send duration
+        const dur = await playerRef.current.getDuration();
+        if (dur) onDurationChange?.(dur);
+        
+        // Expose controls to parent
+        onReadyControls?.({
+          play: () => playerRef.current.play(),
+          pause: () => playerRef.current.pause(),
+          seekTo: (s: number) => playerRef.current.setCurrentTime(s),
+          getCurrentTime: () => playerRef.current.getCurrentTime(),
+          getPaused: () => playerRef.current.getPaused()
+        });
       });
 
       // Event listeners
@@ -118,7 +135,7 @@ export const VimeoPlayer: React.FC<VimeoPlayerProps> = ({
     } catch (error) {
       console.error('Failed to create Vimeo player:', error);
     }
-  }, [apiLoaded, videoId, onPlaybackUpdate]);
+  }, [apiLoaded, videoId, onPlaybackUpdate, onDurationChange, onReadyControls]);
 
   // Expose methods for parent component
   useEffect(() => {
