@@ -47,7 +47,7 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
   onPlaybackStateChange 
 }) => {
   const { user } = useAuth();
-  // Realtime sync initialized below
+  // Using realtime sync for live partner synchronization
   const { quality, setQuality } = useVideoQuality();
   const {
     seedFile, 
