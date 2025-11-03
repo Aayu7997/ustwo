@@ -148,7 +148,7 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
       sendPlaybackUpdate(currentTime, true);
       sendSyncEvent('play', currentTime, true);
     }
-  }, [currentTime, enableSync, updatePlaybackState]);
+  }, [currentTime, enableSync, sendPlaybackUpdate, sendSyncEvent]);
 
   const handlePause = useCallback(() => {
     setIsPlaying(false);
@@ -156,7 +156,7 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
       sendPlaybackUpdate(currentTime, false);
       sendSyncEvent('pause', currentTime, false);
     }
-  }, [currentTime, enableSync, updatePlaybackState]);
+  }, [currentTime, enableSync, sendPlaybackUpdate, sendSyncEvent]);
 
   // Playback controls
   const togglePlayPause = () => {
@@ -474,10 +474,7 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
                   setCurrentTime(time);
                   setIsPlaying(playing);
                   if (enableSync) {
-                    updatePlaybackState({
-                      is_playing: playing,
-                      current_time_seconds: time
-                    });
+                    sendPlaybackUpdate(time, playing);
                   }
                 }}
               />

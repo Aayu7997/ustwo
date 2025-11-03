@@ -17,7 +17,9 @@ declare global {
 
 export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
   videoId,
-  onPlaybackUpdate
+  onPlaybackUpdate,
+  onDurationChange,
+  onReadyControls
 }) => {
   const playerRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
