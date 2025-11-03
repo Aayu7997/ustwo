@@ -28,7 +28,7 @@ import {
   Wifi
 } from 'lucide-react';
 import Hls from 'hls.js';
-import { useRoom } from '@/hooks/useRoom';
+import { useRealtimeSync } from '@/hooks/useRealtimeSync';
 import { useWebTorrent } from '@/hooks/useWebTorrent';
 import { useVideoQuality } from '@/hooks/useVideoQuality';
 import { VIDEO_QUALITY_PRESETS, VideoQuality } from '@/utils/videoQuality';
@@ -47,7 +47,7 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
   onPlaybackStateChange 
 }) => {
   const { user } = useAuth();
-  const { updatePlaybackState } = useRoom(roomId);
+  // Realtime sync initialized below
   const { quality, setQuality } = useVideoQuality();
   const {
     seedFile, 
@@ -83,6 +83,38 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
   const [enableP2P, setEnableP2P] = useState(true);
   const [enableSync, setEnableSync] = useState(true);
 
+  // YouTube controls bridge
+  const ytControlsRef = useRef<{ play: () => void; pause: () => void; seekTo: (s: number) => void; getCurrentTime: () => number; getPlayerState: () => any } | null>(null);
+
+  // Realtime sync: listen and act on partner updates
+  const { sendPlaybackUpdate, sendSyncEvent } = useRealtimeSync({
+    roomId,
+    onPlaybackUpdate: () => {},
+    onMediaSync: (syncTime: number, syncPlaying: boolean) => {
+      // Apply to active player
+      if (currentMediaType === 'youtube' && ytControlsRef.current) {
+        const cur = ytControlsRef.current.getCurrentTime?.() ?? 0;
+        if (Math.abs(cur - syncTime) > 0.7) {
+          ytControlsRef.current.seekTo(syncTime);
+        }
+        if (syncPlaying) ytControlsRef.current.play();
+        else ytControlsRef.current.pause();
+      } else if (videoRef.current) {
+        if (Math.abs(videoRef.current.currentTime - syncTime) > 0.7) {
+          videoRef.current.currentTime = syncTime;
+        }
+        if (syncPlaying && videoRef.current.paused) {
+          void videoRef.current.play();
+        }
+        if (!syncPlaying && !videoRef.current.paused) {
+          videoRef.current.pause();
+        }
+      }
+      setIsPlaying(syncPlaying);
+      setCurrentTime(syncTime);
+    }
+  });
+
   // Update playback state callback
   useEffect(() => {
     onPlaybackStateChange?.({
@@ -99,13 +131,10 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
       setCurrentTime(time);
       
       if (enableSync && Math.abs(time - currentTime) > 1) {
-        updatePlaybackState({
-          current_time_seconds: time,
-          is_playing: isPlaying
-        });
+        sendPlaybackUpdate(time, isPlaying);
       }
     }
-  }, [currentTime, isPlaying, enableSync, updatePlaybackState]);
+  }, [currentTime, isPlaying, enableSync, sendPlaybackUpdate]);
 
   const handleLoadedMetadata = useCallback(() => {
     if (videoRef.current) {
@@ -116,46 +145,42 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
   const handlePlay = useCallback(() => {
     setIsPlaying(true);
     if (enableSync) {
-      updatePlaybackState({
-        current_time_seconds: currentTime,
-        is_playing: true
-      });
+      sendPlaybackUpdate(currentTime, true);
+      sendSyncEvent('play', currentTime, true);
     }
   }, [currentTime, enableSync, updatePlaybackState]);
 
   const handlePause = useCallback(() => {
     setIsPlaying(false);
     if (enableSync) {
-      updatePlaybackState({
-        current_time_seconds: currentTime,
-        is_playing: false
-      });
+      sendPlaybackUpdate(currentTime, false);
+      sendSyncEvent('pause', currentTime, false);
     }
   }, [currentTime, enableSync, updatePlaybackState]);
 
   // Playback controls
   const togglePlayPause = () => {
-    if (!videoRef.current) return;
-    
-    if (isPlaying) {
-      videoRef.current.pause();
-    } else {
-      videoRef.current.play();
+    if (currentMediaType === 'youtube' && ytControlsRef.current) {
+      if (isPlaying) ytControlsRef.current.pause();
+      else ytControlsRef.current.play();
+      return;
     }
+    if (!videoRef.current) return;
+    if (isPlaying) videoRef.current.pause();
+    else void videoRef.current.play();
   };
 
   const handleSeek = (value: number[]) => {
-    if (videoRef.current) {
-      const time = (value[0] / 100) * duration;
+    const time = (value[0] / 100) * (duration || 0);
+    if (currentMediaType === 'youtube' && ytControlsRef.current) {
+      ytControlsRef.current.seekTo(time);
+    } else if (videoRef.current) {
       videoRef.current.currentTime = time;
-      setCurrentTime(time);
-      
-      if (enableSync) {
-        updatePlaybackState({
-          current_time_seconds: time,
-          is_playing: isPlaying
-        });
-      }
+    }
+    setCurrentTime(time);
+    if (enableSync) {
+      sendPlaybackUpdate(time, isPlaying);
+      sendSyncEvent('seek', time, isPlaying);
     }
   };
 
@@ -434,12 +459,11 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
                   setCurrentTime(time);
                   setIsPlaying(playing);
                   if (enableSync) {
-                    updatePlaybackState({
-                      is_playing: playing,
-                      current_time_seconds: time
-                    });
+                    sendPlaybackUpdate(time, playing);
                   }
                 }}
+                onDurationChange={(d) => setDuration(d)}
+                onReadyControls={(api) => { ytControlsRef.current = api; }}
               />
             </div>
           ) : currentMediaType === 'vimeo' ? (

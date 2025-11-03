@@ -4,6 +4,8 @@ import { Card, CardContent } from '@/components/ui/card';
 interface YouTubePlayerProps {
   videoId: string;
   onPlaybackUpdate?: (currentTime: number, isPlaying: boolean) => void;
+  onDurationChange?: (duration: number) => void;
+  onReadyControls?: (controls: { play: () => void; pause: () => void; seekTo: (s: number) => void; getCurrentTime: () => number; getPlayerState: () => any }) => void;
 }
 
 declare global {
@@ -21,6 +23,8 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const [isReady, setIsReady] = useState(false);
   const [apiLoaded, setApiLoaded] = useState(false);
+  const playIntervalRef = useRef<number | null>(null);
+  const apiPollRef = useRef<number | null>(null);
 
   useEffect(() => {
     // Load YouTube IFrame API safely
@@ -49,6 +53,19 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
         setApiLoaded(true);
         previous?.();
       };
+
+      // Fallback: poll in case callback doesn't fire
+      if (!apiPollRef.current) {
+        apiPollRef.current = window.setInterval(() => {
+          if (ensureApiReady()) {
+            setApiLoaded(true);
+            if (apiPollRef.current) {
+              clearInterval(apiPollRef.current);
+              apiPollRef.current = null;
+            }
+          }
+        }, 300);
+      }
     }
 
     return () => {
@@ -59,11 +76,33 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
           console.warn('Error destroying YouTube player:', error);
         }
       }
+      if (apiPollRef.current) {
+        clearInterval(apiPollRef.current);
+        apiPollRef.current = null;
+      }
+      if (playIntervalRef.current) {
+        clearInterval(playIntervalRef.current);
+        playIntervalRef.current = null;
+      }
     };
   }, []);
 
   useEffect(() => {
     if (!apiLoaded || !containerRef.current || !videoId) return;
+
+    // If player exists, just cue new video id
+    if (playerRef.current && isReady) {
+      try {
+        playerRef.current.cueVideoById(videoId);
+        const dur = playerRef.current.getDuration?.();
+        if (dur) onDurationChange?.(dur);
+      } catch (e) {
+        console.warn('Error cueing new video, rebuilding player', e);
+        try { playerRef.current.destroy(); } catch {}
+        playerRef.current = null;
+      }
+      return;
+    }
 
     console.log('Creating YouTube player for video:', videoId);
 
@@ -85,24 +124,44 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
           onReady: (event: any) => {
             console.log('YouTube player ready');
             setIsReady(true);
+            const dur = event.target.getDuration?.();
+            if (dur) onDurationChange?.(dur);
+            // Expose controls to parent
+            onReadyControls?.({
+              play: () => event.target.playVideo(),
+              pause: () => event.target.pauseVideo(),
+              seekTo: (s: number) => event.target.seekTo(s, true),
+              getCurrentTime: () => event.target.getCurrentTime(),
+              getPlayerState: () => event.target.getPlayerState()
+            });
           },
           onStateChange: (event: any) => {
             const player = event.target;
-            const currentTime = player.getCurrentTime();
             const state = event.data;
 
-            console.log('YouTube state change:', state, 'time:', currentTime);
+            // Clear previous interval
+            if (playIntervalRef.current) {
+              clearInterval(playIntervalRef.current);
+              playIntervalRef.current = null;
+            }
 
             // YT.PlayerState: UNSTARTED (-1), ENDED (0), PLAYING (1), PAUSED (2), BUFFERING (3), CUED (5)
             switch (state) {
-              case window.YT.PlayerState.PLAYING:
-                onPlaybackUpdate?.(currentTime, true);
+              case window.YT.PlayerState.PLAYING: {
+                onPlaybackUpdate?.(player.getCurrentTime(), true);
+                // Emit periodic updates while playing
+                playIntervalRef.current = window.setInterval(() => {
+                  try {
+                    onPlaybackUpdate?.(player.getCurrentTime(), true);
+                  } catch {}
+                }, 500);
                 break;
+              }
               case window.YT.PlayerState.PAUSED:
-                onPlaybackUpdate?.(currentTime, false);
+                onPlaybackUpdate?.(player.getCurrentTime(), false);
                 break;
               case window.YT.PlayerState.ENDED:
-                onPlaybackUpdate?.(currentTime, false);
+                onPlaybackUpdate?.(player.getCurrentTime(), false);
                 break;
             }
           },
@@ -130,7 +189,7 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
     } catch (error) {
       console.error('Failed to create YouTube player:', error);
     }
-  }, [apiLoaded, videoId, onPlaybackUpdate]);
+  }, [apiLoaded, videoId, onPlaybackUpdate, onDurationChange, onReadyControls, isReady]);
 
   // Sync methods that can be called from parent
   const play = () => {
