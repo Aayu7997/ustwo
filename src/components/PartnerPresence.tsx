@@ -124,31 +124,21 @@ export const PartnerPresence: React.FC<PartnerPresenceProps> = ({ roomId }) => {
         )}
       </AnimatePresence>
 
-      {/* Join animation */}
+      {/* Brief join celebration - non-blocking */}
       <AnimatePresence>
         {partnerJoined && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.8 }}
-            className="absolute inset-0 flex items-center justify-center bg-pink-500/20 backdrop-blur-sm rounded-lg"
-            onAnimationComplete={() => {
-              // Animation completes and element disappears after 2 seconds
-              setTimeout(() => {}, 2000);
-            }}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 10 }}
+            className="mt-2 p-2 bg-pink-100/80 dark:bg-pink-900/30 rounded-lg border border-pink-200/50 dark:border-pink-700/50"
           >
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: [0, 1.2, 1] }}
-              className="text-center"
-            >
-              <div className="w-16 h-16 bg-pink-500 rounded-full flex items-center justify-center mx-auto mb-2">
-                <Heart className="w-8 h-8 text-white animate-pulse" />
-              </div>
-              <p className="text-sm font-semibold text-pink-600 dark:text-pink-400">
-                Your partner joined! 💕
-              </p>
-            </motion.div>
+            <div className="flex items-center gap-2 text-sm">
+              <Heart className="w-4 h-4 text-pink-500 animate-pulse" />
+              <span className="text-pink-600 dark:text-pink-400 font-medium">
+                Partner connected! Ready to watch together 💕
+              </span>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
