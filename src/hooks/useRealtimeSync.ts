@@ -81,20 +81,27 @@ export const useRealtimeSync = ({ roomId, onPlaybackUpdate, onMediaSync, onSyncE
   }, [roomId, onPlaybackUpdate, onMediaSync]);
 
   const sendPlaybackUpdate = async (currentTime: number, isPlaying: boolean) => {
-    if (!user) return;
-    
     try {
-      const { error } = await supabase
+      const { error, count } = await supabase
         .from('playback_state')
-        .upsert({
+        .update({
+          current_time_seconds: currentTime,
+          is_playing: isPlaying,
+          updated_at: new Date().toISOString()
+        }, { count: 'exact' })
+        .eq('room_id', roomId);
+
+      if (error) throw error;
+
+      // If no row existed, insert one
+      if (!count || count === 0) {
+        await supabase.from('playback_state').insert({
           room_id: roomId,
           current_time_seconds: currentTime,
           is_playing: isPlaying,
-          last_updated_by: user.id,
-          updated_at: new Date().toISOString()
-        }, { onConflict: 'room_id' });
-        
-      if (error) throw error;
+          last_updated_by: user?.id ?? null
+        });
+      }
     } catch (error) {
       console.error('Error sending playback update:', error);
     }

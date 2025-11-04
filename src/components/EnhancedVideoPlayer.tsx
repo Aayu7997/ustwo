@@ -86,6 +86,7 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
   // YouTube/Vimeo controls bridge
   const ytControlsRef = useRef<{ play: () => void; pause: () => void; seekTo: (s: number) => void; getCurrentTime: () => number; getPlayerState: () => any } | null>(null);
   const vimeoControlsRef = useRef<{ play: () => void; pause: () => void; seekTo: (s: number) => void; getCurrentTime: () => Promise<number>; getPaused: () => Promise<boolean> } | null>(null);
+  const syncIntervalRef = useRef<number | null>(null);
 
   // Realtime sync: listen and act on partner updates
   const { sendPlaybackUpdate, sendSyncEvent } = useRealtimeSync({
@@ -138,12 +139,8 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
     if (videoRef.current) {
       const time = videoRef.current.currentTime;
       setCurrentTime(time);
-      
-      if (enableSync && Math.abs(time - currentTime) > 1) {
-        sendPlaybackUpdate(time, isPlaying);
-      }
     }
-  }, [currentTime, isPlaying, enableSync, sendPlaybackUpdate]);
+  }, []);
 
   const handleLoadedMetadata = useCallback(() => {
     if (videoRef.current) {
@@ -154,18 +151,48 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
   const handlePlay = useCallback(() => {
     setIsPlaying(true);
     if (enableSync) {
-      sendPlaybackUpdate(currentTime, true);
-      sendSyncEvent('play', currentTime, true);
+      // Clear existing interval
+      if (syncIntervalRef.current) {
+        clearInterval(syncIntervalRef.current);
+        syncIntervalRef.current = null;
+      }
+      // Send immediate update and start periodic pings
+      const sendNow = async () => {
+        try {
+          let time = 0;
+          if (currentMediaType === 'youtube' && ytControlsRef.current) {
+            time = ytControlsRef.current.getCurrentTime?.() ?? 0;
+          } else if (currentMediaType === 'vimeo' && vimeoControlsRef.current) {
+            time = (await vimeoControlsRef.current.getCurrentTime?.()) ?? 0;
+          } else if (videoRef.current) {
+            time = videoRef.current.currentTime;
+          }
+          setCurrentTime(time);
+          await sendPlaybackUpdate(time, true);
+          await sendSyncEvent('play', time, true);
+        } catch {}
+      };
+      void sendNow();
+      syncIntervalRef.current = window.setInterval(() => {
+        void sendNow();
+      }, 500);
     }
-  }, [currentTime, enableSync, sendPlaybackUpdate, sendSyncEvent]);
+  }, [currentMediaType, enableSync, sendPlaybackUpdate, sendSyncEvent]);
 
   const handlePause = useCallback(() => {
     setIsPlaying(false);
-    if (enableSync) {
-      sendPlaybackUpdate(currentTime, false);
-      sendSyncEvent('pause', currentTime, false);
+    if (syncIntervalRef.current) {
+      clearInterval(syncIntervalRef.current);
+      syncIntervalRef.current = null;
     }
-  }, [currentTime, enableSync, sendPlaybackUpdate, sendSyncEvent]);
+    if (enableSync) {
+      const time = currentMediaType === 'youtube' && ytControlsRef.current
+        ? ytControlsRef.current.getCurrentTime?.() ?? 0
+        : videoRef.current?.currentTime ?? 0;
+      sendPlaybackUpdate(time, false);
+      sendSyncEvent('pause', time, false);
+    }
+  }, [currentMediaType, enableSync, sendPlaybackUpdate, sendSyncEvent]);
 
   // Playback controls
   const togglePlayPause = () => {
@@ -413,15 +440,51 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
     }
   };
 
-  // Listen for torrent downloads
+  // Initial sync: fetch latest playback_state and apply when joining
   useEffect(() => {
-    if (torrentData && currentMediaType !== 'torrent') {
-      toast({
-        title: "Partner shared a file! 🎉",
-        description: "File is being downloaded via P2P",
-      });
+    const applyInitial = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('playback_state')
+          .select('current_time_seconds,is_playing')
+          .eq('room_id', roomId)
+          .maybeSingle();
+        if (error) return;
+        if (!data) return;
+        const syncTime = Number(data.current_time_seconds) || 0;
+        const syncPlaying = !!data.is_playing;
+
+        // Seek & play/pause based on current media
+        if (currentMediaType === 'youtube' && ytControlsRef.current) {
+          const cur = ytControlsRef.current.getCurrentTime?.() ?? 0;
+          if (Math.abs(cur - syncTime) > 0.7) {
+            ytControlsRef.current.seekTo(syncTime);
+          }
+          if (syncPlaying) ytControlsRef.current.play(); else ytControlsRef.current.pause();
+        } else if (currentMediaType === 'vimeo' && vimeoControlsRef.current) {
+          const cur = (await vimeoControlsRef.current.getCurrentTime?.()) ?? 0;
+          if (Math.abs(cur - syncTime) > 0.7) {
+            vimeoControlsRef.current.seekTo(syncTime);
+          }
+          const paused = await vimeoControlsRef.current.getPaused?.();
+          if (syncPlaying && paused) vimeoControlsRef.current.play();
+          else if (!syncPlaying && !paused) vimeoControlsRef.current.pause();
+        } else if (videoRef.current) {
+          if (Math.abs(videoRef.current.currentTime - syncTime) > 0.7) {
+            videoRef.current.currentTime = syncTime;
+          }
+          if (syncPlaying && videoRef.current.paused) void videoRef.current.play();
+          if (!syncPlaying && !videoRef.current.paused) videoRef.current.pause();
+        }
+        setIsPlaying(syncPlaying);
+        setCurrentTime(syncTime);
+      } catch {}
+    };
+
+    if (enableSync) {
+      void applyInitial();
     }
-  }, [torrentData, currentMediaType]);
+  }, [roomId, currentMediaType, enableSync]);
 
   // Setup video element
   useEffect(() => {
@@ -447,6 +510,10 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
       if (hlsRef.current) {
         try { hlsRef.current.destroy(); } catch {}
         hlsRef.current = null;
+      }
+      if (syncIntervalRef.current) {
+        clearInterval(syncIntervalRef.current);
+        syncIntervalRef.current = null;
       }
     };
   }, []);
@@ -479,7 +546,24 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
                   }
                 }}
                 onDurationChange={(d) => setDuration(d)}
-                onReadyControls={(api) => { ytControlsRef.current = api; }}
+                onReadyControls={async (api) => { 
+                  ytControlsRef.current = api; 
+                  // Apply latest state once controls ready
+                  try {
+                    const { data } = await supabase
+                      .from('playback_state')
+                      .select('current_time_seconds,is_playing')
+                      .eq('room_id', roomId)
+                      .maybeSingle();
+                    if (data) {
+                      const t = Number(data.current_time_seconds) || 0;
+                      if (Math.abs(api.getCurrentTime?.() - t) > 0.7) api.seekTo(t);
+                      data.is_playing ? api.play() : api.pause();
+                      setCurrentTime(t);
+                      setIsPlaying(!!data.is_playing);
+                    }
+                  } catch {}
+                }}
               />
             </div>
           ) : currentMediaType === 'vimeo' ? (
@@ -494,7 +578,23 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
                   }
                 }}
                 onDurationChange={(d) => setDuration(d)}
-                onReadyControls={(api) => { vimeoControlsRef.current = api; }}
+                 onReadyControls={async (api) => { 
+                    vimeoControlsRef.current = api; 
+                    try {
+                      const { data } = await supabase
+                        .from('playback_state')
+                        .select('current_time_seconds,is_playing')
+                        .eq('room_id', roomId)
+                        .maybeSingle();
+                      if (data) {
+                        const t = Number(data.current_time_seconds) || 0;
+                        api.seekTo(t);
+                        if (data.is_playing) api.play(); else api.pause();
+                        setCurrentTime(t);
+                        setIsPlaying(!!data.is_playing);
+                      }
+                    } catch {}
+                  }}
               />
             </div>
           ) : (
