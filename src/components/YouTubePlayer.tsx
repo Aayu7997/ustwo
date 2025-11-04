@@ -45,6 +45,17 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
         script.id = 'youtube-iframe-api';
         script.src = 'https://www.youtube.com/iframe_api';
         script.async = true;
+        script.onerror = () => {
+          console.error('Failed to load YouTube IFrame API');
+        };
+        script.onload = () => {
+          // Extra safety: sometimes onYouTubeIframeAPIReady is delayed
+          const tryReady = () => {
+            if (ensureApiReady()) return;
+            setTimeout(tryReady, 200);
+          };
+          tryReady();
+        };
         document.body.appendChild(script);
       }
 
@@ -117,10 +128,11 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
           autoplay: 0,
           controls: 1,
           enablejsapi: 1,
-          // origin intentionally omitted to avoid cross-origin strictness in preview iframes
+          origin: window.location.origin,
           rel: 0,
           showinfo: 0,
-          modestbranding: 1
+          modestbranding: 1,
+          iv_load_policy: 3
         },
         events: {
           onReady: (event: any) => {

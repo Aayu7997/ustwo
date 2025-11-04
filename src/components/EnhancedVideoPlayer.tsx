@@ -90,7 +90,7 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
   // Realtime sync: listen and act on partner updates
   const { sendPlaybackUpdate, sendSyncEvent } = useRealtimeSync({
     roomId,
-    onPlaybackUpdate: () => {},
+    onPlaybackUpdate: (state) => { console.log('Partner sync received:', state); },
     onMediaSync: async (syncTime: number, syncPlaying: boolean) => {
       // Apply to active player
       if (currentMediaType === 'youtube' && ytControlsRef.current) {

@@ -44,6 +44,21 @@ export const useRealtimeSync = ({ roomId, onPlaybackUpdate, onMediaSync, onSyncE
           onMediaSync(newState.current_time_seconds, newState.is_playing);
         }
       )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'playback_state',
+          filter: `room_id=eq.${roomId}`
+        },
+        (payload) => {
+          console.log('Playback state inserted:', payload);
+          const newState = payload.new as PlaybackState;
+          onPlaybackUpdate(newState);
+          onMediaSync(newState.current_time_seconds, newState.is_playing);
+        }
+      )
       .on('broadcast', { event: 'sync_event' }, (payload) => {
         const event = payload.payload as SyncEvent;
         console.log('Received sync event:', event);
@@ -66,15 +81,20 @@ export const useRealtimeSync = ({ roomId, onPlaybackUpdate, onMediaSync, onSyncE
   }, [roomId, onPlaybackUpdate, onMediaSync]);
 
   const sendPlaybackUpdate = async (currentTime: number, isPlaying: boolean) => {
+    if (!user) return;
+    
     try {
-      await supabase
+      const { error } = await supabase
         .from('playback_state')
-        .update({
+        .upsert({
+          room_id: roomId,
           current_time_seconds: currentTime,
           is_playing: isPlaying,
+          last_updated_by: user.id,
           updated_at: new Date().toISOString()
-        })
-        .eq('room_id', roomId);
+        }, { onConflict: 'room_id' });
+        
+      if (error) throw error;
     } catch (error) {
       console.error('Error sending playback update:', error);
     }
