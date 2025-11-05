@@ -259,11 +259,45 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
     }
   }, [isReady]);
 
+  // Fallback: native iframe when API fails
+  useEffect(() => {
+    if (!useFallback || !containerRef.current || !videoId) return;
+
+    console.log('Using YouTube iframe fallback for:', videoId);
+    const iframe = document.createElement('iframe');
+    iframe.src = `https://www.youtube.com/embed/${videoId}?enablejsapi=1&origin=${window.location.origin}`;
+    iframe.width = '100%';
+    iframe.height = '400';
+    iframe.allow = 'autoplay; encrypted-media';
+    iframe.allowFullscreen = true;
+    iframe.style.border = 'none';
+    
+    containerRef.current.innerHTML = '';
+    containerRef.current.appendChild(iframe);
+    iframeRef.current = iframe;
+
+    setIsReady(true);
+    onDurationChange?.(0); // Fallback doesn't report duration
+    
+    // Expose basic controls (limited functionality)
+    onReadyControls?.({
+      play: () => iframe.contentWindow?.postMessage('{"event":"command","func":"playVideo","args":""}', '*'),
+      pause: () => iframe.contentWindow?.postMessage('{"event":"command","func":"pauseVideo","args":""}', '*'),
+      seekTo: (s: number) => iframe.contentWindow?.postMessage(`{"event":"command","func":"seekTo","args":[${s}, true]}`, '*'),
+      getCurrentTime: () => 0,
+      getPlayerState: () => -1
+    });
+
+    return () => {
+      if (containerRef.current) containerRef.current.innerHTML = '';
+    };
+  }, [useFallback, videoId, onReadyControls, onDurationChange]);
+
   return (
     <Card className="overflow-hidden">
       <CardContent className="p-0">
         <div className="relative">
-          {!apiLoaded && (
+          {!apiLoaded && !useFallback && (
             <div className="flex items-center justify-center h-64 bg-black/10">
               <div className="text-center">
                 <div className="w-8 h-8 border-4 border-red-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
@@ -274,7 +308,7 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
           
           <div 
             ref={containerRef}
-            className={`w-full ${!apiLoaded ? 'hidden' : ''}`}
+            className={`w-full ${!apiLoaded && !useFallback ? 'hidden' : ''}`}
             style={{ aspectRatio: '16/9' }}
             aria-label="YouTube player container"
           />
@@ -285,7 +319,7 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
             <div>
               <h3 className="font-medium">YouTube Video</h3>
               <p className="text-sm text-muted-foreground">
-                YouTube playback synced automatically
+                {useFallback ? 'Basic playback mode (API unavailable)' : 'YouTube playback synced automatically'}
               </p>
             </div>
           </div>

@@ -381,6 +381,8 @@ export type Database = {
         Row: {
           created_at: string
           creator_id: string
+          current_media_type: string | null
+          current_media_url: string | null
           id: string
           is_private: boolean | null
           name: string
@@ -392,6 +394,8 @@ export type Database = {
         Insert: {
           created_at?: string
           creator_id: string
+          current_media_type?: string | null
+          current_media_url?: string | null
           id?: string
           is_private?: boolean | null
           name: string
@@ -403,6 +407,8 @@ export type Database = {
         Update: {
           created_at?: string
           creator_id?: string
+          current_media_type?: string | null
+          current_media_url?: string | null
           id?: string
           is_private?: boolean | null
           name?: string
@@ -609,14 +615,8 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      generate_invite_code: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      generate_room_code: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
+      generate_invite_code: { Args: never; Returns: string }
+      generate_room_code: { Args: never; Returns: string }
       get_invite_by_code: {
         Args: { p_invite_code: string }
         Returns: {
@@ -633,6 +633,8 @@ export type Database = {
         Returns: {
           created_at: string
           creator_id: string
+          current_media_type: string | null
+          current_media_url: string | null
           id: string
           is_private: boolean | null
           name: string
@@ -640,6 +642,12 @@ export type Database = {
           room_code: string | null
           status: Database["public"]["Enums"]["room_status"] | null
           updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "rooms"
+          isOneToOne: true
+          isSetofReturn: false
         }
       }
       increment_hearts_received: {
@@ -655,6 +663,8 @@ export type Database = {
         Returns: {
           created_at: string
           creator_id: string
+          current_media_type: string | null
+          current_media_url: string | null
           id: string
           is_private: boolean | null
           name: string
@@ -662,6 +672,12 @@ export type Database = {
           room_code: string | null
           status: Database["public"]["Enums"]["room_status"] | null
           updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "rooms"
+          isOneToOne: true
+          isSetofReturn: false
         }
       }
     }

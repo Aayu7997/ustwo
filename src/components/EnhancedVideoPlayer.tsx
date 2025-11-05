@@ -303,6 +303,20 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
     }
   };
 
+  const syncMediaSource = async (url: string, type: string) => {
+    try {
+      await supabase
+        .from('rooms')
+        .update({ 
+          current_media_url: url, 
+          current_media_type: type 
+        })
+        .eq('id', roomId);
+    } catch (error) {
+      console.error('Failed to sync media source:', error);
+    }
+  };
+
   const handleDirectUrlLoad = async () => {
     if (!directUrl.trim()) {
       toast({
@@ -331,6 +345,7 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
       if (vimeoMatch) {
         setVideoSrc(vimeoMatch[1]);
         setCurrentMediaType('vimeo');
+        await syncMediaSource(vimeoMatch[1], 'vimeo');
         toast({
           title: "Vimeo Video Loaded! 📺",
           description: "Vimeo video is ready to play"
@@ -345,6 +360,7 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
         setYoutubeVideoId(ytId);
         setCurrentMediaType('youtube');
         setVideoSrc('');
+        await syncMediaSource(ytId, 'youtube');
         toast({ title: 'YouTube Video Loaded! 📺', description: 'YouTube video is ready to play' });
       } else if (urlToLoad.includes('.m3u8')) {
         // HLS stream
@@ -378,6 +394,7 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
           
           setCurrentMediaType('hls');
           setVideoSrc('');
+          await syncMediaSource(urlToLoad, 'hls');
           toast({ title: 'HLS Stream Loaded! 📺', description: 'Live stream is ready to play' });
         } else {
           toast({ title: 'HLS Not Supported', description: "Your browser doesn't support HLS streaming. Try Chrome or Safari.", variant: 'destructive' });
@@ -388,6 +405,7 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
         setYoutubeVideoId(null);
         setVideoSrc(urlToLoad);
         setCurrentMediaType('url');
+        await syncMediaSource(urlToLoad, 'url');
         toast({ title: 'Video URL Loaded! 🎬', description: 'Video is ready to play' });
       } else {
         toast({ title: 'Unsupported Format', description: 'Please provide a direct video URL (.mp4, .webm, .ogg), HLS (.m3u8), YouTube or Vimeo link', variant: 'destructive' });
@@ -410,7 +428,7 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
     return (match && match[2].length === 11) ? match[2] : null;
   };
 
-  const handleYouTubeLoad = () => {
+  const handleYouTubeLoad = async () => {
     if (!youtubeUrl.trim()) {
       toast({
         title: "No YouTube URL provided",
@@ -426,6 +444,7 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
       setYoutubeVideoId(videoId);
       setCurrentMediaType('youtube');
       setVideoSrc(''); // Clear other sources
+      await syncMediaSource(videoId, 'youtube');
       
       toast({
         title: 'YouTube Video Loaded! 📺',
@@ -440,10 +459,105 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
     }
   };
 
-  // Initial sync: fetch latest playback_state and apply when joining
+  // Realtime media source sync: listen for partner loading new media
+  useEffect(() => {
+    const channel = supabase
+      .channel(`room_media_${roomId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'rooms',
+          filter: `id=eq.${roomId}`
+        },
+        (payload) => {
+          const newRoom = payload.new as any;
+          if (!newRoom.current_media_url || !newRoom.current_media_type) return;
+          
+          // Don't reload if it's our own update
+          const isSameMedia = 
+            (currentMediaType === newRoom.current_media_type) &&
+            ((currentMediaType === 'youtube' && youtubeVideoId === newRoom.current_media_url) ||
+             (currentMediaType === 'vimeo' && videoSrc === newRoom.current_media_url) ||
+             ((currentMediaType === 'url' || currentMediaType === 'hls') && videoSrc === newRoom.current_media_url));
+          
+          if (isSameMedia) return;
+          
+          console.log('Partner loaded new media:', newRoom.current_media_type, newRoom.current_media_url);
+          
+          // Apply partner's media choice
+          if (newRoom.current_media_type === 'youtube') {
+            setYoutubeVideoId(newRoom.current_media_url);
+            setCurrentMediaType('youtube');
+            setVideoSrc('');
+            toast({ title: 'Partner loaded YouTube video', description: 'Syncing playback...' });
+          } else if (newRoom.current_media_type === 'vimeo') {
+            setVideoSrc(newRoom.current_media_url);
+            setCurrentMediaType('vimeo');
+            setYoutubeVideoId(null);
+            toast({ title: 'Partner loaded Vimeo video', description: 'Syncing playback...' });
+          } else if (newRoom.current_media_type === 'hls') {
+            if (Hls.isSupported()) {
+              if (hlsRef.current) { try { hlsRef.current.destroy(); } catch {} }
+              hlsRef.current = new Hls();
+              hlsRef.current.loadSource(newRoom.current_media_url);
+              if (videoRef.current) hlsRef.current.attachMedia(videoRef.current);
+            }
+            setCurrentMediaType('hls');
+            setVideoSrc('');
+            setYoutubeVideoId(null);
+            toast({ title: 'Partner loaded HLS stream', description: 'Syncing playback...' });
+          } else if (newRoom.current_media_type === 'url') {
+            setVideoSrc(newRoom.current_media_url);
+            setCurrentMediaType('url');
+            setYoutubeVideoId(null);
+            toast({ title: 'Partner loaded video URL', description: 'Syncing playback...' });
+          }
+        }
+      )
+      .subscribe();
+    
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [roomId, currentMediaType, youtubeVideoId, videoSrc]);
+
+  // Initial sync: fetch latest playback_state and media source when joining
   useEffect(() => {
     const applyInitial = async () => {
       try {
+        // Fetch current media source
+        const { data: roomData } = await supabase
+          .from('rooms')
+          .select('current_media_url, current_media_type')
+          .eq('id', roomId)
+          .single();
+        
+        if (roomData?.current_media_url && roomData?.current_media_type) {
+          const mediaUrl = roomData.current_media_url;
+          const mediaType = roomData.current_media_type;
+          
+          if (mediaType === 'youtube' && !youtubeVideoId) {
+            setYoutubeVideoId(mediaUrl);
+            setCurrentMediaType('youtube');
+          } else if (mediaType === 'vimeo' && !videoSrc) {
+            setVideoSrc(mediaUrl);
+            setCurrentMediaType('vimeo');
+          } else if ((mediaType === 'url' || mediaType === 'hls') && !videoSrc) {
+            if (mediaType === 'hls' && Hls.isSupported()) {
+              if (hlsRef.current) { try { hlsRef.current.destroy(); } catch {} }
+              hlsRef.current = new Hls();
+              hlsRef.current.loadSource(mediaUrl);
+              if (videoRef.current) hlsRef.current.attachMedia(videoRef.current);
+            } else {
+              setVideoSrc(mediaUrl);
+            }
+            setCurrentMediaType(mediaType);
+          }
+        }
+
+        // Fetch playback state
         const { data, error } = await supabase
           .from('playback_state')
           .select('current_time_seconds,is_playing')
