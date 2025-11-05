@@ -25,8 +25,15 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const [isReady, setIsReady] = useState(false);
   const [apiLoaded, setApiLoaded] = useState(false);
+  const [useFallback, setUseFallback] = useState(false);
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const playIntervalRef = useRef<number | null>(null);
   const apiPollRef = useRef<number | null>(null);
+  const pollRef = useRef<number | null>(null);
+  const lastTimeRef = useRef(0);
+  const lastPlayingRef = useRef(false);
+  const durationRef = useRef<number | null>(null);
+  const msgHandlerRef = useRef<(e: MessageEvent) => void>();
 
   useEffect(() => {
     // Load YouTube IFrame API safely
@@ -45,9 +52,10 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
         script.id = 'youtube-iframe-api';
         script.src = 'https://www.youtube.com/iframe_api';
         script.async = true;
-        script.onerror = () => {
-          console.error('Failed to load YouTube IFrame API');
-        };
+         script.onerror = () => {
+           console.error('Failed to load YouTube IFrame API');
+           setUseFallback(true);
+         };
         script.onload = () => {
           // Extra safety: sometimes onYouTubeIframeAPIReady is delayed
           const tryReady = () => {

@@ -28,19 +28,8 @@ export const VimeoPlayer: React.FC<VimeoPlayerProps> = ({
   const [apiLoaded, setApiLoaded] = useState(false);
 
   useEffect(() => {
-    // Load Vimeo Player API
-    if (!window.Vimeo) {
-      const script = document.createElement('script');
-      script.src = 'https://player.vimeo.com/api/player.js';
-      script.async = true;
-      script.onload = () => {
-        console.log('Vimeo Player API loaded');
-        setApiLoaded(true);
-      };
-      document.body.appendChild(script);
-    } else {
-      setApiLoaded(true);
-    }
+    // Use bundled @vimeo/player – no external script needed
+    setApiLoaded(true);
 
     return () => {
       if (playerRef.current) {
@@ -70,7 +59,7 @@ export const VimeoPlayer: React.FC<VimeoPlayerProps> = ({
       containerRef.current.innerHTML = '';
       containerRef.current.appendChild(iframe);
 
-      playerRef.current = new window.Vimeo.Player(iframe);
+      playerRef.current = new Player(iframe);
 
       playerRef.current.ready().then(async () => {
         console.log('Vimeo player ready');
