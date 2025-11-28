@@ -25,10 +25,13 @@ import {
   Youtube,
   Settings,
   Download,
-  Wifi
+  Wifi,
+  FileText
 } from 'lucide-react';
 import Hls from 'hls.js';
 import { useRealtimeSync } from '@/hooks/useRealtimeSync';
+import { useSubtitleSync } from '@/hooks/useSubtitleSync';
+import { SubtitleUploader } from './SubtitleUploader';
 import { useWebTorrent } from '@/hooks/useWebTorrent';
 import { useVideoQuality } from '@/hooks/useVideoQuality';
 import { VIDEO_QUALITY_PRESETS, VideoQuality } from '@/utils/videoQuality';
@@ -123,6 +126,12 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
       setIsPlaying(syncPlaying);
       setCurrentTime(syncTime);
     }
+  });
+
+  // Subtitle sync
+  const { currentSubtitle, loadSubtitles, clearSubtitles, hasSubtitles } = useSubtitleSync({
+    roomId,
+    currentTime
   });
 
   // Update playback state callback
@@ -712,33 +721,44 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
               />
             </div>
           ) : (
-            <video
-              ref={videoRef}
-              src={videoSrc}
-              className="w-full aspect-video object-contain"
-              controls={false}
-              playsInline
-              crossOrigin="anonymous"
-              preload="metadata"
-              onError={(e) => {
-                console.error('Video playback error:', e);
-                if (hlsRef.current) { try { hlsRef.current.destroy(); } catch {} hlsRef.current = null; }
-                if (!videoSrc) return;
-                const err = (e.currentTarget as HTMLVideoElement)?.error;
-                const code = err?.code;
-                const messages: Record<number, string> = {
-                  1: 'Video loading aborted',
-                  2: 'Network error while fetching video',
-                  3: 'Video decoding failed or unsupported format',
-                  4: 'Video source not found'
-                };
-                toast({
-                  title: 'Playback Error',
-                  description: messages[code ?? 0] || 'Failed to load video. Check URL or format.',
-                  variant: 'destructive'
-                });
-              }}
-            />
+            <div className="relative w-full">
+              <video
+                ref={videoRef}
+                src={videoSrc}
+                className="w-full aspect-video object-contain"
+                controls={false}
+                playsInline
+                crossOrigin="anonymous"
+                preload="metadata"
+                onError={(e) => {
+                  console.error('Video playback error:', e);
+                  if (hlsRef.current) { try { hlsRef.current.destroy(); } catch {} hlsRef.current = null; }
+                  if (!videoSrc) return;
+                  const err = (e.currentTarget as HTMLVideoElement)?.error;
+                  const code = err?.code;
+                  const messages: Record<number, string> = {
+                    1: 'Video loading aborted',
+                    2: 'Network error while fetching video',
+                    3: 'Video decoding failed or unsupported format',
+                    4: 'Video source not found'
+                  };
+                  toast({
+                    title: 'Playback Error',
+                    description: messages[code ?? 0] || 'Failed to load video. Check URL or format.',
+                    variant: 'destructive'
+                  });
+                }}
+              />
+              
+              {/* Subtitle Overlay */}
+              {hasSubtitles && currentSubtitle && (
+                <div className="absolute bottom-20 left-0 right-0 flex justify-center px-4 pointer-events-none z-10">
+                  <div className="bg-black/90 text-white px-6 py-3 rounded-lg max-w-4xl text-center text-lg font-medium leading-relaxed shadow-lg">
+                    {currentSubtitle}
+                  </div>
+                </div>
+              )}
+            </div>
           )}
           
           {/* Loading Overlay */}
@@ -855,7 +875,7 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
       <Card>
         <div className="p-6">
           <Tabs defaultValue="file" className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="file" className="flex items-center gap-2">
                 <Upload className="w-4 h-4" />
                 Local File
@@ -867,6 +887,10 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
               <TabsTrigger value="youtube" className="flex items-center gap-2">
                 <Youtube className="w-4 h-4" />
                 YouTube
+              </TabsTrigger>
+              <TabsTrigger value="subtitles" className="flex items-center gap-2">
+                <FileText className="w-4 h-4" />
+                Subtitles
               </TabsTrigger>
               <TabsTrigger value="settings" className="flex items-center gap-2">
                 <Settings className="w-4 h-4" />
@@ -944,6 +968,13 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
                 <Youtube className="w-4 h-4 mr-2" />
                 Load YouTube Video
               </Button>
+            </TabsContent>
+
+            <TabsContent value="subtitles" className="space-y-4">
+              <SubtitleUploader
+                roomId={roomId}
+                onSubtitleUploaded={(url, format) => loadSubtitles(url, format)}
+              />
             </TabsContent>
 
             <TabsContent value="settings" className="space-y-4">
