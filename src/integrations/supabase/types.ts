@@ -537,6 +537,44 @@ export type Database = {
         }
         Relationships: []
       }
+      timestamped_notes: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          room_id: string
+          timestamp: number
+          user_id: string
+          user_name: string | null
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          room_id: string
+          timestamp: number
+          user_id: string
+          user_name?: string | null
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          room_id?: string
+          timestamp?: number
+          user_id?: string
+          user_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "timestamped_notes_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       torrent_links: {
         Row: {
           created_at: string
@@ -607,6 +645,47 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      video_queue: {
+        Row: {
+          added_by: string
+          created_at: string
+          id: string
+          position: number
+          room_id: string
+          title: string
+          type: string
+          url: string
+        }
+        Insert: {
+          added_by: string
+          created_at?: string
+          id?: string
+          position?: number
+          room_id: string
+          title: string
+          type: string
+          url: string
+        }
+        Update: {
+          added_by?: string
+          created_at?: string
+          id?: string
+          position?: number
+          room_id?: string
+          title?: string
+          type?: string
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_queue_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
           },
         ]
       }
