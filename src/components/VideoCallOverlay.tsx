@@ -1,8 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { usePersistentWebRTC } from '@/hooks/usePersistentWebRTC';
+import { useWebRTC } from '@/hooks/useWebRTC';
 import { useVideoPiP } from '@/hooks/useVideoPiP';
-import { useVideoQuality } from '@/hooks/useVideoQuality';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -19,7 +18,6 @@ import {
   Move
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { VIDEO_QUALITY_PRESETS } from '@/utils/videoQuality';
 
 interface VideoCallOverlayProps {
   roomId: string;
@@ -34,7 +32,6 @@ export const VideoCallOverlay: React.FC<VideoCallOverlayProps> = ({
   isActive,
   onClose
 }) => {
-  const { quality } = useVideoQuality();
   const { mode, position, customPosition, isDragging, toggleMode, startDrag, endDrag, updateDragPosition } = useVideoPiP();
   const [isAudioEnabled, setIsAudioEnabled] = useState(true);
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
@@ -44,39 +41,28 @@ export const VideoCallOverlay: React.FC<VideoCallOverlayProps> = ({
   const {
     localVideoRef,
     remoteVideoRef,
-    connectionState,
     isConnected,
     stream,
     remoteStream,
-    connectionQuality,
     startCall,
     endCall
-  } = usePersistentWebRTC({ 
+  } = useWebRTC({ 
     roomId, 
     roomCode, 
-    enabled: isActive,
-    quality
+    enabled: isActive
   });
+
+  const connectionState = isConnected ? 'connected' : stream ? 'connecting' : 'idle';
 
   // Start call when overlay becomes active
   useEffect(() => {
-    if (isActive && connectionState === 'idle') {
+    if (isActive && !stream) {
       console.log('[VideoCallOverlay] Starting call...');
-      // Add a small delay to ensure UI is ready
-      const timer = setTimeout(() => {
-        startCall().catch(err => {
-          console.error('[VideoCallOverlay] Failed to start call:', err);
-          toast({
-            title: "Failed to Start Call",
-            description: "Please check your camera and microphone permissions",
-            variant: "destructive"
-          });
-        });
-      }, 300);
-      
-      return () => clearTimeout(timer);
+      startCall().catch(err => {
+        console.error('[VideoCallOverlay] Failed to start call:', err);
+      });
     }
-  }, [isActive, connectionState, startCall]);
+  }, [isActive, stream, startCall]);
 
   const handleEndCall = () => {
     endCall();
@@ -182,8 +168,8 @@ export const VideoCallOverlay: React.FC<VideoCallOverlayProps> = ({
     }
   };
 
-  const isLoading = connectionState === 'connecting' || connectionState === 'reconnecting';
-  const isFailed = connectionState === 'failed' || connectionState === 'disconnected';
+  const isLoading = connectionState === 'connecting';
+  const isFailed = !isConnected && stream;
   const isMinimized = mode === 'minimized';
 
   return (
@@ -316,23 +302,10 @@ export const VideoCallOverlay: React.FC<VideoCallOverlayProps> = ({
               {/* Status Badges */}
               {isConnected && (
                 <div className="absolute top-2 left-2 flex flex-col gap-1">
-                  <Badge variant="default" className="bg-video-active text-white text-xs">
+                   <Badge variant="default" className="bg-video-active text-white text-xs">
                     <div className="w-1.5 h-1.5 bg-white rounded-full mr-1 animate-pulse" />
                     Live
                   </Badge>
-                  {connectionQuality && (
-                    <Badge 
-                      variant="secondary" 
-                      className={cn(
-                        "text-xs",
-                        connectionQuality === 'excellent' && "bg-green-500/80 text-white",
-                        connectionQuality === 'good' && "bg-yellow-500/80 text-white",
-                        connectionQuality === 'poor' && "bg-red-500/80 text-white"
-                      )}
-                    >
-                      {VIDEO_QUALITY_PRESETS[quality].label}
-                    </Badge>
-                  )}
                   {!isAudioEnabled && (
                     <Badge variant="destructive" className="text-xs">
                       <MicOff className="w-2.5 h-2.5 mr-1" />
