@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { EnhancedVideoPlayer } from './EnhancedVideoPlayer';
-import { VideoCallOverlay } from './VideoCallOverlay';
+import { EnhancedVideoCallOverlay } from './EnhancedVideoCallOverlay';
 import { ReactionOverlay } from './ReactionOverlay';
 import { VideoQueue } from './VideoQueue';
 import { TimestampedNotes } from './TimestampedNotes';
 import { Button } from './ui/button';
-import { Video, Copy, Check } from 'lucide-react';
+import { Video, Phone, Copy, Check } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { toast } from '@/hooks/use-toast';
 
@@ -21,6 +21,7 @@ export const IntegratedVideoPlayer: React.FC<IntegratedVideoPlayerProps> = ({
   onPlaybackStateChange
 }) => {
   const [isCallActive, setIsCallActive] = useState(false);
+  const [isVoiceOnly, setIsVoiceOnly] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentVideoUrl, setCurrentVideoUrl] = useState('');
@@ -84,20 +85,35 @@ export const IntegratedVideoPlayer: React.FC<IntegratedVideoPlayerProps> = ({
             onPlaybackStateChange={handlePlaybackUpdate}
           />
 
-          {/* Video Call Toggle Button */}
+          {/* Call Toggle Buttons */}
           {!isCallActive && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="flex justify-center"
+              className="flex justify-center gap-3"
             >
               <Button
-                onClick={() => setIsCallActive(true)}
+                onClick={() => {
+                  setIsVoiceOnly(false);
+                  setIsCallActive(true);
+                }}
                 className="flex items-center gap-2 bg-gradient-to-r from-love-pink to-love-purple hover:from-love-pink/90 hover:to-love-purple/90 text-white shadow-lg"
                 size="lg"
               >
                 <Video className="w-5 h-5" />
                 Start Video Call
+              </Button>
+              <Button
+                onClick={() => {
+                  setIsVoiceOnly(true);
+                  setIsCallActive(true);
+                }}
+                variant="outline"
+                className="flex items-center gap-2"
+                size="lg"
+              >
+                <Phone className="w-5 h-5" />
+                Voice Only
               </Button>
             </motion.div>
           )}
@@ -126,10 +142,11 @@ export const IntegratedVideoPlayer: React.FC<IntegratedVideoPlayerProps> = ({
       />
 
       {/* Video Call Overlay (PiP) */}
-      <VideoCallOverlay
+      <EnhancedVideoCallOverlay
         roomId={roomId}
         roomCode={roomCode}
         isActive={isCallActive}
+        voiceOnly={isVoiceOnly}
         onClose={() => setIsCallActive(false)}
       />
     </div>

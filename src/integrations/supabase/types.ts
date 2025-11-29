@@ -489,6 +489,56 @@ export type Database = {
           },
         ]
       }
+      shared_calendar_events: {
+        Row: {
+          created_at: string | null
+          created_by: string
+          description: string | null
+          duration_minutes: number | null
+          google_event_id: string | null
+          id: string
+          reminder_sent: boolean | null
+          room_id: string
+          scheduled_time: string
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by: string
+          description?: string | null
+          duration_minutes?: number | null
+          google_event_id?: string | null
+          id?: string
+          reminder_sent?: boolean | null
+          room_id: string
+          scheduled_time: string
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string
+          description?: string | null
+          duration_minutes?: number | null
+          google_event_id?: string | null
+          id?: string
+          reminder_sent?: boolean | null
+          room_id?: string
+          scheduled_time?: string
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shared_calendar_events_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       shared_files: {
         Row: {
           created_at: string
@@ -682,6 +732,56 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "video_queue_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      watchlist: {
+        Row: {
+          added_by: string
+          created_at: string | null
+          id: string
+          is_watched: boolean | null
+          media_type: string
+          media_url: string
+          notes: string | null
+          room_id: string
+          thumbnail_url: string | null
+          title: string
+          watched_at: string | null
+        }
+        Insert: {
+          added_by: string
+          created_at?: string | null
+          id?: string
+          is_watched?: boolean | null
+          media_type: string
+          media_url: string
+          notes?: string | null
+          room_id: string
+          thumbnail_url?: string | null
+          title: string
+          watched_at?: string | null
+        }
+        Update: {
+          added_by?: string
+          created_at?: string | null
+          id?: string
+          is_watched?: boolean | null
+          media_type?: string
+          media_url?: string
+          notes?: string | null
+          room_id?: string
+          thumbnail_url?: string | null
+          title?: string
+          watched_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "watchlist_room_id_fkey"
             columns: ["room_id"]
             isOneToOne: false
             referencedRelation: "rooms"

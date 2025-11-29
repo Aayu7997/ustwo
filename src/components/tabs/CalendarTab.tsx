@@ -3,10 +3,11 @@ import { motion } from 'framer-motion';
 import { SharedCalendar } from '@/components/SharedCalendar';
 
 interface CalendarTabProps {
+  roomId: string;
   partnerId?: string;
 }
 
-export const CalendarTab: React.FC<CalendarTabProps> = ({ partnerId }) => {
+export const CalendarTab: React.FC<CalendarTabProps> = ({ roomId }) => {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -22,7 +23,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ partnerId }) => {
         </p>
       </div>
       
-      <SharedCalendar partnerId={partnerId} />
+      <SharedCalendar roomId={roomId} />
     </motion.div>
   );
 };
