@@ -7,6 +7,7 @@ import { RoomSidebar } from '@/components/RoomSidebar';
 import { VideoTab } from '@/components/tabs/VideoTab';
 import { NotesTab } from '@/components/tabs/NotesTab';
 import { CalendarTab } from '@/components/tabs/CalendarTab';
+import { WatchlistTab } from '@/components/tabs/WatchlistTab';
 import { AIMoviesTab } from '@/components/tabs/AIMoviesTab';
 import { LoveMeterTab } from '@/components/tabs/LoveMeterTab';
 import { ThemesTab } from '@/components/tabs/ThemesTab';
@@ -20,7 +21,7 @@ import { Button } from '@/components/ui/button';
 import { Heart, ArrowLeft } from 'lucide-react';
 import { useRoomPresence } from '@/hooks/useRoomPresence';
 
-type TabType = 'video' | 'notes' | 'calendar' | 'ai-movies' | 'love-meter' | 'themes' | 'settings';
+type TabType = 'video' | 'notes' | 'calendar' | 'watchlist' | 'ai-movies' | 'love-meter' | 'themes' | 'settings';
 
 const Room: React.FC = () => {
   const { roomId } = useParams<{ roomId: string }>();
@@ -100,7 +101,9 @@ const Room: React.FC = () => {
       case 'notes':
         return <NotesTab />;
       case 'calendar':
-        return <CalendarTab partnerId={currentRoom.partner_id} />;
+        return <CalendarTab roomId={roomId} partnerId={currentRoom.partner_id} />;
+      case 'watchlist':
+        return <WatchlistTab roomId={roomId} />;
       case 'ai-movies':
         return (
           <AIMoviesTab
