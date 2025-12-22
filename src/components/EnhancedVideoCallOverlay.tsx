@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useEnhancedWebRTC } from '@/hooks/useEnhancedWebRTC';
+import { useRobustWebRTC } from '@/hooks/useRobustWebRTC';
 import { useVideoPiP } from '@/hooks/useVideoPiP';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -15,7 +15,8 @@ import {
   Minimize2,
   X,
   Move,
-  Phone
+  Phone,
+  RefreshCw
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -52,6 +53,8 @@ export const EnhancedVideoCallOverlay: React.FC<EnhancedVideoCallOverlayProps> =
     localVideoRef,
     remoteVideoRef,
     isConnected,
+    isLoading,
+    isFailed,
     connectionQuality,
     stream,
     remoteStream,
@@ -59,7 +62,7 @@ export const EnhancedVideoCallOverlay: React.FC<EnhancedVideoCallOverlayProps> =
     endCall,
     toggleAudio,
     toggleVideo
-  } = useEnhancedWebRTC({ 
+  } = useRobustWebRTC({ 
     roomId, 
     roomCode, 
     enabled: isActive,
@@ -165,7 +168,6 @@ export const EnhancedVideoCallOverlay: React.FC<EnhancedVideoCallOverlayProps> =
   };
 
   const isMinimized = mode === 'minimized';
-  const isLoading = !isConnected && stream;
 
   return (
     <AnimatePresence>
