@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { YouTubePlayer } from '@/components/YouTubePlayer';
+import { RobustYouTubePlayer } from '@/components/RobustYouTubePlayer';
 import { VimeoPlayer } from '@/components/VimeoPlayer';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
@@ -24,9 +24,9 @@ import {
   Link as LinkIcon,
   Youtube,
   Settings,
-  Download,
   Wifi,
-  FileText
+  FileText,
+  Loader2
 } from 'lucide-react';
 import Hls from 'hls.js';
 import { useRealtimeSync } from '@/hooks/useRealtimeSync';
@@ -35,6 +35,7 @@ import { SubtitleUploader } from './SubtitleUploader';
 import { useWebTorrent } from '@/hooks/useWebTorrent';
 import { useVideoQuality } from '@/hooks/useVideoQuality';
 import { VIDEO_QUALITY_PRESETS, VideoQuality } from '@/utils/videoQuality';
+import { useMediaSync } from '@/hooks/useMediaSync';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -50,7 +51,6 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
   onPlaybackStateChange 
 }) => {
   const { user } = useAuth();
-  // Using realtime sync for live partner synchronization
   const { quality, setQuality } = useVideoQuality();
   const {
     seedFile, 
@@ -63,6 +63,9 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
   const videoRef = useRef<HTMLVideoElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const hlsRef = useRef<Hls | null>(null);
+  const syncIntervalRef = useRef<number | null>(null);
+  const playerReadyRef = useRef<boolean>(false);
+  const pendingSyncRef = useRef<{ time: number; isPlaying: boolean } | null>(null);
   
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -72,6 +75,8 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [autoplayBlocked, setAutoplayBlocked] = useState(false);
 
   // Media source states
   const [videoSrc, setVideoSrc] = useState('');
@@ -80,7 +85,7 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
   const [vimeoUrl, setVimeoUrl] = useState('');
   const [directUrl, setDirectUrl] = useState('');
   const [currentFile, setCurrentFile] = useState<File | null>(null);
-  const [currentMediaType, setCurrentMediaType] = useState<'local' | 'url' | 'youtube' | 'vimeo' | 'hls' | 'torrent'>('local');
+  const [currentMediaType, setCurrentMediaType] = useState<'local' | 'url' | 'youtube' | 'vimeo' | 'hls' | 'torrent' | 'storage'>('local');
   
   // Settings
   const [enableP2P, setEnableP2P] = useState(true);
@@ -89,42 +94,125 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
   // YouTube/Vimeo controls bridge
   const ytControlsRef = useRef<{ play: () => void; pause: () => void; seekTo: (s: number) => void; getCurrentTime: () => number; getPlayerState: () => any } | null>(null);
   const vimeoControlsRef = useRef<{ play: () => void; pause: () => void; seekTo: (s: number) => void; getCurrentTime: () => Promise<number>; getPaused: () => Promise<boolean> } | null>(null);
-  const syncIntervalRef = useRef<number | null>(null);
 
-  // Realtime sync: listen and act on partner updates
-  const { sendPlaybackUpdate, sendSyncEvent } = useRealtimeSync({
+  // Media sync hook for storage-based file sharing
+  const {
+    uploadMediaFile,
+    getSignedUrl,
+    isStorageUrl,
+    syncMediaSource,
+    sendPlaybackState,
+    broadcastSync,
+    fetchInitialState
+  } = useMediaSync({
     roomId,
-    onPlaybackUpdate: (state) => { console.log('Partner sync received:', state); },
-    onMediaSync: async (syncTime: number, syncPlaying: boolean) => {
-      // Apply to active player
-      if (currentMediaType === 'youtube' && ytControlsRef.current) {
-        const cur = ytControlsRef.current.getCurrentTime?.() ?? 0;
-        if (Math.abs(cur - syncTime) > 0.7) {
-          ytControlsRef.current.seekTo(syncTime);
-        }
-        if (syncPlaying) ytControlsRef.current.play();
-        else ytControlsRef.current.pause();
-      } else if (currentMediaType === 'vimeo' && vimeoControlsRef.current) {
-        const cur = await vimeoControlsRef.current.getCurrentTime?.() ?? 0;
-        if (Math.abs(cur - syncTime) > 0.7) {
-          vimeoControlsRef.current.seekTo(syncTime);
-        }
-        const isPaused = await vimeoControlsRef.current.getPaused?.() ?? true;
-        if (syncPlaying && isPaused) vimeoControlsRef.current.play();
-        else if (!syncPlaying && !isPaused) vimeoControlsRef.current.pause();
-      } else if (videoRef.current) {
-        if (Math.abs(videoRef.current.currentTime - syncTime) > 0.7) {
-          videoRef.current.currentTime = syncTime;
-        }
-        if (syncPlaying && videoRef.current.paused) {
-          void videoRef.current.play();
-        }
-        if (!syncPlaying && !videoRef.current.paused) {
-          videoRef.current.pause();
+    onSyncReceived: async (state) => {
+      console.log('[EnhancedPlayer] Sync received:', state);
+      
+      // Handle media source change
+      if (state.mediaUrl && state.mediaType) {
+        await handleMediaSourceChange(state.mediaUrl, state.mediaType);
+        return;
+      }
+
+      // Handle playback state sync
+      if (playerReadyRef.current) {
+        await applySyncState(state.time, state.isPlaying);
+      } else {
+        pendingSyncRef.current = { time: state.time, isPlaying: state.isPlaying };
+      }
+    }
+  });
+
+  // Apply sync state to current player
+  const applySyncState = useCallback(async (time: number, playing: boolean) => {
+    const SYNC_THRESHOLD = 0.7;
+
+    if (currentMediaType === 'youtube' && ytControlsRef.current) {
+      const cur = ytControlsRef.current.getCurrentTime?.() ?? 0;
+      if (Math.abs(cur - time) > SYNC_THRESHOLD) {
+        ytControlsRef.current.seekTo(time);
+      }
+      if (playing) ytControlsRef.current.play();
+      else ytControlsRef.current.pause();
+    } else if (currentMediaType === 'vimeo' && vimeoControlsRef.current) {
+      const cur = await vimeoControlsRef.current.getCurrentTime?.() ?? 0;
+      if (Math.abs(cur - time) > SYNC_THRESHOLD) {
+        vimeoControlsRef.current.seekTo(time);
+      }
+      const isPaused = await vimeoControlsRef.current.getPaused?.() ?? true;
+      if (playing && isPaused) vimeoControlsRef.current.play();
+      else if (!playing && !isPaused) vimeoControlsRef.current.pause();
+    } else if (videoRef.current) {
+      if (Math.abs(videoRef.current.currentTime - time) > SYNC_THRESHOLD) {
+        videoRef.current.currentTime = time;
+      }
+      if (playing && videoRef.current.paused) {
+        try {
+          await videoRef.current.play();
+        } catch (e) {
+          console.log('[EnhancedPlayer] Autoplay blocked, showing overlay');
+          setAutoplayBlocked(true);
         }
       }
-      setIsPlaying(syncPlaying);
-      setCurrentTime(syncTime);
+      if (!playing && !videoRef.current.paused) {
+        videoRef.current.pause();
+      }
+    }
+    setIsPlaying(playing);
+    setCurrentTime(time);
+  }, [currentMediaType]);
+
+  // Handle media source change from partner
+  const handleMediaSourceChange = useCallback(async (url: string, type: string) => {
+    console.log('[EnhancedPlayer] Media source change:', type, url);
+    
+    setIsLoading(true);
+    playerReadyRef.current = false;
+
+    if (type === 'youtube') {
+      setYoutubeVideoId(url);
+      setCurrentMediaType('youtube');
+      setVideoSrc('');
+      toast({ title: 'Partner loaded YouTube video', description: 'Syncing playback...' });
+    } else if (type === 'vimeo') {
+      setVideoSrc(url);
+      setCurrentMediaType('vimeo');
+      setYoutubeVideoId(null);
+      toast({ title: 'Partner loaded Vimeo video', description: 'Syncing playback...' });
+    } else if (type === 'hls') {
+      if (Hls.isSupported()) {
+        if (hlsRef.current) { try { hlsRef.current.destroy(); } catch {} }
+        hlsRef.current = new Hls();
+        hlsRef.current.loadSource(url);
+        if (videoRef.current) hlsRef.current.attachMedia(videoRef.current);
+      }
+      setCurrentMediaType('hls');
+      setVideoSrc('');
+      setYoutubeVideoId(null);
+      toast({ title: 'Partner loaded HLS stream', description: 'Syncing playback...' });
+    } else if (type === 'storage' || type === 'url' || type === 'local') {
+      setVideoSrc(url);
+      setCurrentMediaType(type === 'storage' ? 'storage' : 'url');
+      setYoutubeVideoId(null);
+      toast({ title: 'Partner loaded video', description: 'Syncing playback...' });
+    }
+    
+    setIsLoading(false);
+  }, []);
+
+  // Realtime sync for playback control events
+  const { sendPlaybackUpdate, sendSyncEvent } = useRealtimeSync({
+    roomId,
+    onPlaybackUpdate: (state) => { 
+      console.log('[EnhancedPlayer] Realtime playback update:', state); 
+    },
+    onMediaSync: async (syncTime: number, syncPlaying: boolean) => {
+      if (playerReadyRef.current) {
+        await applySyncState(syncTime, syncPlaying);
+      } else {
+        pendingSyncRef.current = { time: syncTime, isPlaying: syncPlaying };
+      }
     }
   });
 
@@ -143,29 +231,39 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
     });
   }, [isPlaying, currentTime, duration, onPlaybackStateChange]);
 
-  // Video event handlers
-  const handleTimeUpdate = useCallback(() => {
-    if (videoRef.current) {
-      const time = videoRef.current.currentTime;
-      setCurrentTime(time);
-    }
-  }, []);
-
+  // Mark player as ready when video metadata loads
   const handleLoadedMetadata = useCallback(() => {
     if (videoRef.current) {
       setDuration(videoRef.current.duration);
+      playerReadyRef.current = true;
+      setIsLoading(false);
+      
+      // Apply pending sync
+      if (pendingSyncRef.current) {
+        const { time, isPlaying: playing } = pendingSyncRef.current;
+        console.log('[EnhancedPlayer] Applying pending sync:', pendingSyncRef.current);
+        applySyncState(time, playing);
+        pendingSyncRef.current = null;
+      }
+    }
+  }, [applySyncState]);
+
+  const handleTimeUpdate = useCallback(() => {
+    if (videoRef.current) {
+      setCurrentTime(videoRef.current.currentTime);
     }
   }, []);
 
   const handlePlay = useCallback(() => {
     setIsPlaying(true);
+    setAutoplayBlocked(false);
+    
     if (enableSync) {
-      // Clear existing interval
       if (syncIntervalRef.current) {
         clearInterval(syncIntervalRef.current);
         syncIntervalRef.current = null;
       }
-      // Send immediate update and start periodic pings
+
       const sendNow = async () => {
         try {
           let time = 0;
@@ -177,31 +275,44 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
             time = videoRef.current.currentTime;
           }
           setCurrentTime(time);
-          await sendPlaybackUpdate(time, true);
-          await sendSyncEvent('play', time, true);
+          await sendPlaybackState(time, true);
+          await broadcastSync('play', time, true);
         } catch {}
       };
+      
       void sendNow();
       syncIntervalRef.current = window.setInterval(() => {
         void sendNow();
       }, 500);
     }
-  }, [currentMediaType, enableSync, sendPlaybackUpdate, sendSyncEvent]);
+  }, [currentMediaType, enableSync, sendPlaybackState, broadcastSync]);
 
   const handlePause = useCallback(() => {
     setIsPlaying(false);
+    
     if (syncIntervalRef.current) {
       clearInterval(syncIntervalRef.current);
       syncIntervalRef.current = null;
     }
+    
     if (enableSync) {
-      const time = currentMediaType === 'youtube' && ytControlsRef.current
-        ? ytControlsRef.current.getCurrentTime?.() ?? 0
-        : videoRef.current?.currentTime ?? 0;
-      sendPlaybackUpdate(time, false);
-      sendSyncEvent('pause', time, false);
+      const getTime = async () => {
+        if (currentMediaType === 'youtube' && ytControlsRef.current) {
+          return ytControlsRef.current.getCurrentTime?.() ?? 0;
+        } else if (currentMediaType === 'vimeo' && vimeoControlsRef.current) {
+          return (await vimeoControlsRef.current.getCurrentTime?.()) ?? 0;
+        } else if (videoRef.current) {
+          return videoRef.current.currentTime;
+        }
+        return 0;
+      };
+      
+      getTime().then(time => {
+        sendPlaybackState(time, false);
+        broadcastSync('pause', time, false);
+      });
     }
-  }, [currentMediaType, enableSync, sendPlaybackUpdate, sendSyncEvent]);
+  }, [currentMediaType, enableSync, sendPlaybackState, broadcastSync]);
 
   // Playback controls
   const togglePlayPause = () => {
@@ -217,7 +328,7 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
     }
     if (!videoRef.current) return;
     if (isPlaying) videoRef.current.pause();
-    else void videoRef.current.play();
+    else void videoRef.current.play().catch(() => setAutoplayBlocked(true));
   };
 
   const handleSeek = (value: number[]) => {
@@ -231,8 +342,8 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
     }
     setCurrentTime(time);
     if (enableSync) {
-      sendPlaybackUpdate(time, isPlaying);
-      sendSyncEvent('seek', time, isPlaying);
+      sendPlaybackState(time, isPlaying);
+      broadcastSync('seek', time, isPlaying);
     }
   };
 
@@ -267,63 +378,94 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
     }
   };
 
-  // File handling
-  const handleFileSelect = async (files: FileList | null) => {
-    if (files && files.length > 0) {
-      const file = files[0];
-      
-      if (file.type.startsWith('video/')) {
-        // Check if we should seed via WebTorrent
-        if (enableP2P && roomCode) {
-          setCurrentFile(file);
-          setCurrentMediaType('torrent');
-          
-          const magnetURI = await seedFile(file);
-          if (magnetURI) {
-            toast({
-              title: "File Shared via P2P! 🌐",
-              description: `${file.name} is being shared with your partner`
-            });
-          } else {
-            // Fallback to local playback
-            const url = URL.createObjectURL(file);
-            setVideoSrc(url);
-            setCurrentMediaType('local');
-          }
-        } else {
-          const url = URL.createObjectURL(file);
-          setVideoSrc(url);
-          setCurrentMediaType('local');
-        }
-        
-        setCurrentFile(file);
-        
-        toast({
-          title: "Local Video Loaded! 🎬",
-          description: `${file.name} is ready to play`
-        });
-      } else {
-        toast({
-          title: "Invalid File Type",
-          description: "Please select a video file",
-          variant: "destructive"
-        });
-      }
+  // Handle autoplay unlock
+  const handleUnlockAutoplay = async () => {
+    setAutoplayBlocked(false);
+    if (videoRef.current) {
+      try {
+        await videoRef.current.play();
+        setIsPlaying(true);
+      } catch {}
     }
   };
 
-  const syncMediaSource = async (url: string, type: string) => {
-    try {
-      await supabase
-        .from('rooms')
-        .update({ 
-          current_media_url: url, 
-          current_media_type: type 
-        })
-        .eq('id', roomId);
-    } catch (error) {
-      console.error('Failed to sync media source:', error);
+  // File handling with Storage upload
+  const handleFileSelect = async (files: FileList | null) => {
+    if (!files || files.length === 0 || !user) return;
+
+    const file = files[0];
+    if (!file.type.startsWith('video/')) {
+      toast({
+        title: "Invalid File Type",
+        description: "Please select a video file",
+        variant: "destructive"
+      });
+      return;
     }
+
+    setCurrentFile(file);
+    setIsUploading(true);
+    setIsLoading(true);
+    playerReadyRef.current = false;
+
+    try {
+      // Upload to Supabase Storage
+      const storagePath = await uploadMediaFile(file);
+      
+      if (storagePath) {
+        // Get signed URL for local playback
+        const signedUrl = await getSignedUrl(storagePath);
+        
+        if (signedUrl) {
+          setVideoSrc(signedUrl);
+          setCurrentMediaType('storage');
+          setYoutubeVideoId(null);
+          
+          // Sync storage path (not signed URL) to room
+          await syncMediaSource(storagePath, 'storage');
+          
+          toast({
+            title: "Video Uploaded & Shared! 🎬",
+            description: `${file.name} is now synced with your partner`
+          });
+        } else {
+          throw new Error('Failed to generate playback URL');
+        }
+      } else {
+        // Fallback to local blob URL (won't sync to partner)
+        const blobUrl = URL.createObjectURL(file);
+        setVideoSrc(blobUrl);
+        setCurrentMediaType('local');
+        
+        toast({
+          title: "Local Video Loaded",
+          description: "Upload failed, playing locally only. Partner won't see this video.",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('[EnhancedPlayer] File upload failed:', error);
+      
+      // Fallback to local playback
+      const blobUrl = URL.createObjectURL(file);
+      setVideoSrc(blobUrl);
+      setCurrentMediaType('local');
+      
+      toast({
+        title: "Upload Failed",
+        description: "Playing locally. Partner won't see this video.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsUploading(false);
+      setIsLoading(false);
+    }
+  };
+
+  const extractYouTubeId = (url: string): string | null => {
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+    const match = url.match(regExp);
+    return (match && match[2].length === 11) ? match[2] : null;
   };
 
   const handleDirectUrlLoad = async () => {
@@ -337,93 +479,83 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
     }
 
     setIsLoading(true);
+    playerReadyRef.current = false;
     
     try {
       const urlToLoad = directUrl.trim();
       
-      // Check URL format validity
+      // Validate URL format
       let validUrl: URL;
       try {
         validUrl = new URL(urlToLoad.startsWith('http') ? urlToLoad : `https://${urlToLoad}`);
-      } catch (urlError) {
-        throw new Error('Invalid URL format. Please enter a valid URL.');
+      } catch {
+        throw new Error('Invalid URL format');
       }
       
-      // Check if it's a Vimeo URL
+      // Check for Vimeo
       const vimeoMatch = urlToLoad.match(/vimeo\.com\/(?:video\/)?(\d+)/);
       if (vimeoMatch) {
         setVideoSrc(vimeoMatch[1]);
         setCurrentMediaType('vimeo');
         await syncMediaSource(vimeoMatch[1], 'vimeo');
-        toast({
-          title: "Vimeo Video Loaded! 📺",
-          description: "Vimeo video is ready to play"
-        });
-        setIsLoading(false);
+        toast({ title: "Vimeo Video Loaded! 📺" });
         return;
       }
 
-      // YouTube links
+      // Check for YouTube
       const ytId = extractYouTubeId(urlToLoad);
       if (ytId) {
         setYoutubeVideoId(ytId);
         setCurrentMediaType('youtube');
         setVideoSrc('');
         await syncMediaSource(ytId, 'youtube');
-        toast({ title: 'YouTube Video Loaded! 📺', description: 'YouTube video is ready to play' });
-      } else if (urlToLoad.includes('.m3u8')) {
-        // HLS stream
+        toast({ title: 'YouTube Video Loaded! 📺' });
+        return;
+      }
+
+      // HLS stream
+      if (urlToLoad.includes('.m3u8')) {
         if (Hls.isSupported()) {
-          if (hlsRef.current) {
-            try { hlsRef.current.destroy(); } catch {}
-          }
-          
+          if (hlsRef.current) { try { hlsRef.current.destroy(); } catch {} }
           hlsRef.current = new Hls({
             maxBufferLength: 30,
             maxMaxBufferLength: 600,
             enableWorker: true,
             lowLatencyMode: true,
           });
-          
-          hlsRef.current.on(Hls.Events.ERROR, (event, data) => {
-            console.error('HLS Error:', data);
+          hlsRef.current.on(Hls.Events.ERROR, (_, data) => {
             if (data.fatal) {
-              toast({
-                title: 'Stream Error',
-                description: 'Failed to load HLS stream. Please check the URL.',
-                variant: 'destructive'
-              });
+              toast({ title: 'Stream Error', description: 'Failed to load HLS stream', variant: 'destructive' });
             }
           });
-          
           hlsRef.current.loadSource(urlToLoad);
-          if (videoRef.current) {
-            hlsRef.current.attachMedia(videoRef.current);
-          }
-          
+          if (videoRef.current) hlsRef.current.attachMedia(videoRef.current);
           setCurrentMediaType('hls');
           setVideoSrc('');
           await syncMediaSource(urlToLoad, 'hls');
-          toast({ title: 'HLS Stream Loaded! 📺', description: 'Live stream is ready to play' });
+          toast({ title: 'HLS Stream Loaded! 📺' });
         } else {
-          toast({ title: 'HLS Not Supported', description: "Your browser doesn't support HLS streaming. Try Chrome or Safari.", variant: 'destructive' });
+          throw new Error('HLS not supported in your browser');
         }
-      } else if (urlToLoad.match(/\.(mp4|webm|ogg|mov)$/i)) {
-        // Direct video file
+        return;
+      }
+
+      // Direct video URL
+      if (urlToLoad.match(/\.(mp4|webm|ogg|mov)$/i) || validUrl.protocol.startsWith('http')) {
         if (hlsRef.current) { try { hlsRef.current.destroy(); } catch {} hlsRef.current = null; }
         setYoutubeVideoId(null);
-        setVideoSrc(urlToLoad);
+        setVideoSrc(validUrl.href);
         setCurrentMediaType('url');
-        await syncMediaSource(urlToLoad, 'url');
-        toast({ title: 'Video URL Loaded! 🎬', description: 'Video is ready to play' });
+        await syncMediaSource(validUrl.href, 'url');
+        toast({ title: 'Video URL Loaded! 🎬' });
       } else {
-        toast({ title: 'Unsupported Format', description: 'Please provide a direct video URL (.mp4, .webm, .ogg), HLS (.m3u8), YouTube or Vimeo link', variant: 'destructive' });
+        throw new Error('Unsupported format. Use MP4, WebM, HLS, YouTube or Vimeo links.');
       }
     } catch (error) {
       console.error('Error loading video URL:', error);
       toast({
         title: "Loading Error",
-        description: error instanceof Error ? error.message : "Failed to load video. Please check the URL format.",
+        description: error instanceof Error ? error.message : "Failed to load video",
         variant: "destructive"
       });
     } finally {
@@ -431,185 +563,91 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
     }
   };
 
-  const extractYouTubeId = (url: string): string | null => {
-    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
-    const match = url.match(regExp);
-    return (match && match[2].length === 11) ? match[2] : null;
-  };
-
   const handleYouTubeLoad = async () => {
     if (!youtubeUrl.trim()) {
-      toast({
-        title: "No YouTube URL provided",
-        description: "Please enter a YouTube URL",
-        variant: "destructive"
-      });
+      toast({ title: "No YouTube URL provided", variant: "destructive" });
       return;
     }
 
     const videoId = extractYouTubeId(youtubeUrl);
     if (videoId) {
-      console.log('Loading YouTube video:', videoId);
       setYoutubeVideoId(videoId);
       setCurrentMediaType('youtube');
-      setVideoSrc(''); // Clear other sources
+      setVideoSrc('');
+      playerReadyRef.current = false;
       await syncMediaSource(videoId, 'youtube');
-      
-      toast({
-        title: 'YouTube Video Loaded! 📺',
-        description: 'YouTube video is ready to play'
-      });
+      toast({ title: 'YouTube Video Loaded! 📺' });
     } else {
-      toast({
-        title: 'Invalid YouTube URL',
-        description: 'Please enter a valid YouTube video URL',
-        variant: 'destructive'
-      });
+      toast({ title: 'Invalid YouTube URL', variant: 'destructive' });
     }
   };
 
-  // Realtime media source sync: listen for partner loading new media
+  // Realtime media source sync from room
   useEffect(() => {
     const channel = supabase
       .channel(`room_media_${roomId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'rooms',
-          filter: `id=eq.${roomId}`
-        },
-        (payload) => {
-          const newRoom = payload.new as any;
-          if (!newRoom.current_media_url || !newRoom.current_media_type) return;
-          
-          // Don't reload if it's our own update
-          const isSameMedia = 
-            (currentMediaType === newRoom.current_media_type) &&
-            ((currentMediaType === 'youtube' && youtubeVideoId === newRoom.current_media_url) ||
-             (currentMediaType === 'vimeo' && videoSrc === newRoom.current_media_url) ||
-             ((currentMediaType === 'url' || currentMediaType === 'hls') && videoSrc === newRoom.current_media_url));
-          
-          if (isSameMedia) return;
-          
-          console.log('Partner loaded new media:', newRoom.current_media_type, newRoom.current_media_url);
-          
-          // Apply partner's media choice
-          if (newRoom.current_media_type === 'youtube') {
-            setYoutubeVideoId(newRoom.current_media_url);
-            setCurrentMediaType('youtube');
-            setVideoSrc('');
-            toast({ title: 'Partner loaded YouTube video', description: 'Syncing playback...' });
-          } else if (newRoom.current_media_type === 'vimeo') {
-            setVideoSrc(newRoom.current_media_url);
-            setCurrentMediaType('vimeo');
-            setYoutubeVideoId(null);
-            toast({ title: 'Partner loaded Vimeo video', description: 'Syncing playback...' });
-          } else if (newRoom.current_media_type === 'hls') {
-            if (Hls.isSupported()) {
-              if (hlsRef.current) { try { hlsRef.current.destroy(); } catch {} }
-              hlsRef.current = new Hls();
-              hlsRef.current.loadSource(newRoom.current_media_url);
-              if (videoRef.current) hlsRef.current.attachMedia(videoRef.current);
-            }
-            setCurrentMediaType('hls');
-            setVideoSrc('');
-            setYoutubeVideoId(null);
-            toast({ title: 'Partner loaded HLS stream', description: 'Syncing playback...' });
-          } else if (newRoom.current_media_type === 'url') {
-            setVideoSrc(newRoom.current_media_url);
-            setCurrentMediaType('url');
-            setYoutubeVideoId(null);
-            toast({ title: 'Partner loaded video URL', description: 'Syncing playback...' });
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'rooms',
+        filter: `id=eq.${roomId}`
+      }, async (payload) => {
+        const newRoom = payload.new as any;
+        if (!newRoom.current_media_url || !newRoom.current_media_type) return;
+        
+        // Check if same media
+        const isSameMedia = 
+          (currentMediaType === newRoom.current_media_type) &&
+          ((currentMediaType === 'youtube' && youtubeVideoId === newRoom.current_media_url) ||
+           (currentMediaType === 'vimeo' && videoSrc === newRoom.current_media_url) ||
+           ((currentMediaType === 'url' || currentMediaType === 'hls') && videoSrc === newRoom.current_media_url));
+        
+        if (isSameMedia) return;
+        
+        console.log('[EnhancedPlayer] Partner media update:', newRoom.current_media_type, newRoom.current_media_url);
+        
+        let mediaUrl = newRoom.current_media_url;
+        
+        // Resolve storage URLs
+        if (isStorageUrl(mediaUrl)) {
+          const signedUrl = await getSignedUrl(mediaUrl);
+          if (signedUrl) {
+            mediaUrl = signedUrl;
+          } else {
+            toast({ title: 'Failed to load shared video', variant: 'destructive' });
+            return;
           }
         }
-      )
+        
+        await handleMediaSourceChange(mediaUrl, newRoom.current_media_type);
+      })
       .subscribe();
     
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [roomId, currentMediaType, youtubeVideoId, videoSrc]);
+    return () => { supabase.removeChannel(channel); };
+  }, [roomId, currentMediaType, youtubeVideoId, videoSrc, isStorageUrl, getSignedUrl, handleMediaSourceChange]);
 
-  // Initial sync: fetch latest playback_state and media source when joining
+  // Initial sync on mount
   useEffect(() => {
     const applyInitial = async () => {
-      try {
-        // Fetch current media source
-        const { data: roomData } = await supabase
-          .from('rooms')
-          .select('current_media_url, current_media_type')
-          .eq('id', roomId)
-          .single();
-        
-        if (roomData?.current_media_url && roomData?.current_media_type) {
-          const mediaUrl = roomData.current_media_url;
-          const mediaType = roomData.current_media_type;
-          
-          if (mediaType === 'youtube' && !youtubeVideoId) {
-            setYoutubeVideoId(mediaUrl);
-            setCurrentMediaType('youtube');
-          } else if (mediaType === 'vimeo' && !videoSrc) {
-            setVideoSrc(mediaUrl);
-            setCurrentMediaType('vimeo');
-          } else if ((mediaType === 'url' || mediaType === 'hls') && !videoSrc) {
-            if (mediaType === 'hls' && Hls.isSupported()) {
-              if (hlsRef.current) { try { hlsRef.current.destroy(); } catch {} }
-              hlsRef.current = new Hls();
-              hlsRef.current.loadSource(mediaUrl);
-              if (videoRef.current) hlsRef.current.attachMedia(videoRef.current);
-            } else {
-              setVideoSrc(mediaUrl);
-            }
-            setCurrentMediaType(mediaType);
-          }
-        }
-
-        // Fetch playback state
-        const { data, error } = await supabase
-          .from('playback_state')
-          .select('current_time_seconds,is_playing')
-          .eq('room_id', roomId)
-          .maybeSingle();
-        if (error) return;
-        if (!data) return;
-        const syncTime = Number(data.current_time_seconds) || 0;
-        const syncPlaying = !!data.is_playing;
-
-        // Seek & play/pause based on current media
-        if (currentMediaType === 'youtube' && ytControlsRef.current) {
-          const cur = ytControlsRef.current.getCurrentTime?.() ?? 0;
-          if (Math.abs(cur - syncTime) > 0.7) {
-            ytControlsRef.current.seekTo(syncTime);
-          }
-          if (syncPlaying) ytControlsRef.current.play(); else ytControlsRef.current.pause();
-        } else if (currentMediaType === 'vimeo' && vimeoControlsRef.current) {
-          const cur = (await vimeoControlsRef.current.getCurrentTime?.()) ?? 0;
-          if (Math.abs(cur - syncTime) > 0.7) {
-            vimeoControlsRef.current.seekTo(syncTime);
-          }
-          const paused = await vimeoControlsRef.current.getPaused?.();
-          if (syncPlaying && paused) vimeoControlsRef.current.play();
-          else if (!syncPlaying && !paused) vimeoControlsRef.current.pause();
-        } else if (videoRef.current) {
-          if (Math.abs(videoRef.current.currentTime - syncTime) > 0.7) {
-            videoRef.current.currentTime = syncTime;
-          }
-          if (syncPlaying && videoRef.current.paused) void videoRef.current.play();
-          if (!syncPlaying && !videoRef.current.paused) videoRef.current.pause();
-        }
-        setIsPlaying(syncPlaying);
-        setCurrentTime(syncTime);
-      } catch {}
+      const state = await fetchInitialState();
+      if (!state) return;
+      
+      if (state.mediaUrl && state.mediaType) {
+        await handleMediaSourceChange(state.mediaUrl, state.mediaType);
+      }
+      
+      // Store pending sync for when player becomes ready
+      if (state.time || state.isPlaying) {
+        pendingSyncRef.current = { time: state.time, isPlaying: state.isPlaying };
+      }
     };
 
     if (enableSync) {
       void applyInitial();
     }
-  }, [roomId, currentMediaType, enableSync]);
+  }, [roomId, enableSync, fetchInitialState, handleMediaSourceChange]);
 
-  // Setup video element
+  // Setup video element events
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -627,7 +665,7 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
     };
   }, [handleTimeUpdate, handleLoadedMetadata, handlePlay, handlePause]);
 
-  // Cleanup HLS on unmount
+  // Cleanup
   useEffect(() => {
     return () => {
       if (hlsRef.current) {
@@ -656,36 +694,39 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
     >
       <Card className="overflow-hidden">
         <div className="relative bg-black">
-          {/* Video or YouTube Element */}
+          {/* YouTube Player with RobustYouTubePlayer */}
           {currentMediaType === 'youtube' && youtubeVideoId ? (
             <div className="w-full">
-              <YouTubePlayer 
+              <RobustYouTubePlayer 
                 videoId={youtubeVideoId}
                 onPlaybackUpdate={(time, playing) => {
                   setCurrentTime(time);
                   setIsPlaying(playing);
-                  if (enableSync) {
-                    sendPlaybackUpdate(time, playing);
+                  if (enableSync && playing) {
+                    sendPlaybackState(time, playing);
                   }
                 }}
                 onDurationChange={(d) => setDuration(d)}
-                onReadyControls={async (api) => { 
-                  ytControlsRef.current = api; 
-                  // Apply latest state once controls ready
-                  try {
-                    const { data } = await supabase
-                      .from('playback_state')
-                      .select('current_time_seconds,is_playing')
-                      .eq('room_id', roomId)
-                      .maybeSingle();
-                    if (data) {
-                      const t = Number(data.current_time_seconds) || 0;
-                      if (Math.abs(api.getCurrentTime?.() - t) > 0.7) api.seekTo(t);
-                      data.is_playing ? api.play() : api.pause();
-                      setCurrentTime(t);
-                      setIsPlaying(!!data.is_playing);
+                onReady={() => {
+                  playerReadyRef.current = true;
+                  setIsLoading(false);
+                  
+                  if (pendingSyncRef.current) {
+                    const { time, isPlaying: playing } = pendingSyncRef.current;
+                    if (ytControlsRef.current) {
+                      if (Math.abs(ytControlsRef.current.getCurrentTime() - time) > 0.7) {
+                        ytControlsRef.current.seekTo(time);
+                      }
+                      if (playing) ytControlsRef.current.play();
                     }
-                  } catch {}
+                    pendingSyncRef.current = null;
+                  }
+                }}
+                onReadyControls={(api) => { 
+                  ytControlsRef.current = api; 
+                }}
+                onError={(err) => {
+                  toast({ title: 'YouTube Error', description: err, variant: 'destructive' });
                 }}
               />
             </div>
@@ -696,28 +737,24 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
                 onPlaybackUpdate={(time, playing) => {
                   setCurrentTime(time);
                   setIsPlaying(playing);
-                  if (enableSync) {
-                    sendPlaybackUpdate(time, playing);
+                  if (enableSync && playing) {
+                    sendPlaybackState(time, playing);
                   }
                 }}
                 onDurationChange={(d) => setDuration(d)}
-                 onReadyControls={async (api) => { 
-                    vimeoControlsRef.current = api; 
-                    try {
-                      const { data } = await supabase
-                        .from('playback_state')
-                        .select('current_time_seconds,is_playing')
-                        .eq('room_id', roomId)
-                        .maybeSingle();
-                      if (data) {
-                        const t = Number(data.current_time_seconds) || 0;
-                        api.seekTo(t);
-                        if (data.is_playing) api.play(); else api.pause();
-                        setCurrentTime(t);
-                        setIsPlaying(!!data.is_playing);
-                      }
-                    } catch {}
-                  }}
+                onReadyControls={async (api) => { 
+                  vimeoControlsRef.current = api;
+                  playerReadyRef.current = true;
+                  setIsLoading(false);
+                  
+                  if (pendingSyncRef.current) {
+                    const { time, isPlaying: playing } = pendingSyncRef.current;
+                    api.seekTo(time);
+                    if (playing) api.play();
+                    else api.pause();
+                    pendingSyncRef.current = null;
+                  }
+                }}
               />
             </div>
           ) : (
@@ -734,21 +771,41 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
                   console.error('Video playback error:', e);
                   if (hlsRef.current) { try { hlsRef.current.destroy(); } catch {} hlsRef.current = null; }
                   if (!videoSrc) return;
+                  
+                  // Try to refresh signed URL for storage videos
+                  if (currentMediaType === 'storage') {
+                    toast({
+                      title: 'Playback Error',
+                      description: 'Video URL expired. Refreshing...',
+                    });
+                    // The partner sync will handle re-fetching
+                    return;
+                  }
+                  
                   const err = (e.currentTarget as HTMLVideoElement)?.error;
-                  const code = err?.code;
                   const messages: Record<number, string> = {
                     1: 'Video loading aborted',
                     2: 'Network error while fetching video',
-                    3: 'Video decoding failed or unsupported format',
+                    3: 'Video decoding failed',
                     4: 'Video source not found'
                   };
                   toast({
                     title: 'Playback Error',
-                    description: messages[code ?? 0] || 'Failed to load video. Check URL or format.',
+                    description: messages[err?.code ?? 0] || 'Failed to load video',
                     variant: 'destructive'
                   });
                 }}
               />
+              
+              {/* Autoplay blocked overlay */}
+              {autoplayBlocked && (
+                <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-20">
+                  <Button onClick={handleUnlockAutoplay} size="lg" className="gap-2">
+                    <Play className="w-5 h-5" />
+                    Click to Sync Playback
+                  </Button>
+                </div>
+              )}
               
               {/* Subtitle Overlay */}
               {hasSubtitles && currentSubtitle && (
@@ -762,24 +819,24 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
           )}
           
           {/* Loading Overlay */}
-          {isLoading && (
-            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+          {(isLoading || isUploading) && (
+            <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-30">
               <div className="text-center text-white">
-                <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-                <p>Loading video...</p>
+                <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2" />
+                <p>{isUploading ? 'Uploading video...' : 'Loading video...'}</p>
               </div>
             </div>
           )}
 
           {/* P2P Download Progress */}
           {downloadProgress > 0 && downloadProgress < 100 && (
-            <div className="absolute inset-0 bg-black/75 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/75 flex items-center justify-center z-30">
               <div className="text-center text-white space-y-2">
                 <Wifi className="w-8 h-8 mx-auto animate-pulse" />
                 <p>Downloading via P2P...</p>
-                <div className="w-48 bg-gray-700 rounded-full h-2">
+                <div className="w-48 bg-muted rounded-full h-2">
                   <div 
-                    className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                    className="bg-primary h-2 rounded-full transition-all duration-300"
                     style={{ width: `${downloadProgress}%` }}
                   />
                 </div>
@@ -807,7 +864,13 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => videoRef.current && (videoRef.current.currentTime -= 10)}
+                  onClick={() => {
+                    if (currentMediaType === 'youtube' && ytControlsRef.current) {
+                      ytControlsRef.current.seekTo(Math.max(0, ytControlsRef.current.getCurrentTime() - 10));
+                    } else if (videoRef.current) {
+                      videoRef.current.currentTime = Math.max(0, videoRef.current.currentTime - 10);
+                    }
+                  }}
                   className="text-white hover:bg-white/20"
                 >
                   <SkipBack className="w-4 h-4" />
@@ -825,7 +888,13 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => videoRef.current && (videoRef.current.currentTime += 10)}
+                  onClick={() => {
+                    if (currentMediaType === 'youtube' && ytControlsRef.current) {
+                      ytControlsRef.current.seekTo(ytControlsRef.current.getCurrentTime() + 10);
+                    } else if (videoRef.current) {
+                      videoRef.current.currentTime = Math.min(duration, videoRef.current.currentTime + 10);
+                    }
+                  }}
                   className="text-white hover:bg-white/20"
                 >
                   <SkipForward className="w-4 h-4" />
@@ -910,16 +979,23 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
                 <Button
                   onClick={() => fileInputRef.current?.click()}
                   className="w-full"
-                  disabled={isSeeding}
+                  disabled={isSeeding || isUploading}
                 >
-                  <Upload className="w-4 h-4 mr-2" />
-                  {isSeeding ? 'Sharing File...' : 'Choose Video File'}
+                  {isUploading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Uploading...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-4 h-4 mr-2" />
+                      Choose Video File
+                    </>
+                  )}
                 </Button>
-                {enableP2P && roomCode && (
-                  <p className="text-sm text-muted-foreground mt-2">
-                    P2P sharing enabled - your file will be shared directly with your partner
-                  </p>
-                )}
+                <p className="text-sm text-muted-foreground mt-2">
+                  Videos are uploaded to cloud storage and synced with your partner
+                </p>
               </div>
               
               {currentFile && (
@@ -938,11 +1014,11 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
 
             <TabsContent value="url" className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="direct-url">Video URL (Vimeo, MP4, WebM, HLS)</Label>
+                <Label htmlFor="direct-url">Video URL (Vimeo, MP4, WebM, HLS, YouTube)</Label>
                 <Input
                   id="direct-url"
                   type="url"
-                  placeholder="https://vimeo.com/123456789 or https://example.com/video.m3u8"
+                  placeholder="https://example.com/video.mp4"
                   value={directUrl}
                   onChange={(e) => setDirectUrl(e.target.value)}
                 />
@@ -1039,9 +1115,6 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
                   </Select>
                   <p className="text-sm text-muted-foreground">
                     Current: {VIDEO_QUALITY_PRESETS[quality].label}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Quality applies to video calls. For video playback, quality depends on the source.
                   </p>
                 </div>
               </div>
