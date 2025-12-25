@@ -26,7 +26,9 @@ import {
   Settings,
   Wifi,
   FileText,
-  Loader2
+  Loader2,
+  Radio,
+  MonitorPlay
 } from 'lucide-react';
 import Hls from 'hls.js';
 import { useRealtimeSync } from '@/hooks/useRealtimeSync';
@@ -36,6 +38,7 @@ import { useWebTorrent } from '@/hooks/useWebTorrent';
 import { useVideoQuality } from '@/hooks/useVideoQuality';
 import { VIDEO_QUALITY_PRESETS, VideoQuality } from '@/utils/videoQuality';
 import { useMediaSync } from '@/hooks/useMediaSync';
+import { useMediaStreaming } from '@/hooks/useMediaStreaming';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -85,15 +88,28 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
   const [vimeoUrl, setVimeoUrl] = useState('');
   const [directUrl, setDirectUrl] = useState('');
   const [currentFile, setCurrentFile] = useState<File | null>(null);
-  const [currentMediaType, setCurrentMediaType] = useState<'local' | 'url' | 'youtube' | 'vimeo' | 'hls' | 'torrent' | 'storage'>('local');
+  const [currentMediaType, setCurrentMediaType] = useState<'local' | 'url' | 'youtube' | 'vimeo' | 'hls' | 'torrent' | 'storage' | 'stream'>('local');
   
   // Settings
   const [enableP2P, setEnableP2P] = useState(true);
   const [enableSync, setEnableSync] = useState(true);
+  const [enableLiveStream, setEnableLiveStream] = useState(true);
 
   // YouTube/Vimeo controls bridge
   const ytControlsRef = useRef<{ play: () => void; pause: () => void; seekTo: (s: number) => void; getCurrentTime: () => number; getPlayerState: () => any } | null>(null);
   const vimeoControlsRef = useRef<{ play: () => void; pause: () => void; seekTo: (s: number) => void; getCurrentTime: () => Promise<number>; getPaused: () => Promise<boolean> } | null>(null);
+
+  // P2P Live Streaming hook
+  const {
+    isStreaming,
+    isReceiving,
+    connectionState: streamConnectionState,
+    remoteStream,
+    remoteVideoRef,
+    startStreaming,
+    stopStreaming,
+    syncPlaybackState: syncStreamPlayback
+  } = useMediaStreaming({ roomId, roomCode, enabled: enableLiveStream });
 
   // Media sync hook for storage-based file sharing
   const {
@@ -389,7 +405,7 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
     }
   };
 
-  // File handling with Storage upload
+  // File handling - Local playback with P2P live streaming to partner
   const handleFileSelect = async (files: FileList | null) => {
     if (!files || files.length === 0 || !user) return;
 
@@ -404,63 +420,50 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
     }
 
     setCurrentFile(file);
-    setIsUploading(true);
     setIsLoading(true);
     playerReadyRef.current = false;
 
-    try {
-      // Upload to Supabase Storage
-      const storagePath = await uploadMediaFile(file);
-      
-      if (storagePath) {
-        // Get signed URL for local playback
-        const signedUrl = await getSignedUrl(storagePath);
-        
-        if (signedUrl) {
-          setVideoSrc(signedUrl);
-          setCurrentMediaType('storage');
-          setYoutubeVideoId(null);
-          
-          // Sync storage path (not signed URL) to room
-          await syncMediaSource(storagePath, 'storage');
-          
-          toast({
-            title: "Video Uploaded & Shared! 🎬",
-            description: `${file.name} is now synced with your partner`
-          });
-        } else {
-          throw new Error('Failed to generate playback URL');
-        }
-      } else {
-        // Fallback to local blob URL (won't sync to partner)
-        const blobUrl = URL.createObjectURL(file);
-        setVideoSrc(blobUrl);
-        setCurrentMediaType('local');
-        
-        toast({
-          title: "Local Video Loaded",
-          description: "Upload failed, playing locally only. Partner won't see this video.",
-          variant: "destructive"
-        });
-      }
-    } catch (error) {
-      console.error('[EnhancedPlayer] File upload failed:', error);
-      
-      // Fallback to local playback
-      const blobUrl = URL.createObjectURL(file);
-      setVideoSrc(blobUrl);
-      setCurrentMediaType('local');
-      
+    // Create local blob URL for playback
+    const blobUrl = URL.createObjectURL(file);
+    setVideoSrc(blobUrl);
+    setCurrentMediaType('local');
+    setYoutubeVideoId(null);
+    setIsLoading(false);
+    
+    toast({
+      title: "Video Loaded! 🎬",
+      description: enableLiveStream 
+        ? `${file.name} - Click "Start Streaming" to share with partner`
+        : `${file.name} - Playing locally`
+    });
+  };
+
+  // Start streaming the local video to partner
+  const handleStartStreaming = async () => {
+    if (!videoRef.current || !currentFile) {
       toast({
-        title: "Upload Failed",
-        description: "Playing locally. Partner won't see this video.",
+        title: "No video loaded",
+        description: "Load a local video first",
         variant: "destructive"
       });
-    } finally {
-      setIsUploading(false);
-      setIsLoading(false);
+      return;
+    }
+    
+    const success = await startStreaming(videoRef.current);
+    if (success) {
+      setCurrentMediaType('stream');
     }
   };
+
+  // Stop streaming
+  const handleStopStreaming = async () => {
+    await stopStreaming();
+    if (currentFile) {
+      setCurrentMediaType('local');
+    }
+  };
+
+
 
   const extractYouTubeId = (url: string): string | null => {
     const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
@@ -968,7 +971,7 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
             </TabsList>
 
             <TabsContent value="file" className="space-y-4">
-              <div className="text-center">
+              <div className="text-center space-y-3">
                 <input
                   type="file"
                   ref={fileInputRef}
@@ -979,37 +982,57 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
                 <Button
                   onClick={() => fileInputRef.current?.click()}
                   className="w-full"
-                  disabled={isSeeding || isUploading}
+                  disabled={isSeeding || isStreaming}
                 >
-                  {isUploading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Uploading...
-                    </>
-                  ) : (
-                    <>
-                      <Upload className="w-4 h-4 mr-2" />
-                      Choose Video File
-                    </>
-                  )}
+                  <Upload className="w-4 h-4 mr-2" />
+                  Choose Video File
                 </Button>
-                <p className="text-sm text-muted-foreground mt-2">
-                  Videos are uploaded to cloud storage and synced with your partner
+                
+                {currentFile && (
+                  <div className="space-y-3 p-4 bg-muted/30 rounded-lg">
+                    <p className="text-sm font-medium">{currentFile.name}</p>
+                    
+                    {!isStreaming && !isReceiving ? (
+                      <Button 
+                        onClick={handleStartStreaming} 
+                        className="w-full gap-2"
+                        variant="secondary"
+                      >
+                        <Radio className="w-4 h-4" />
+                        Start Live Streaming to Partner
+                      </Button>
+                    ) : isStreaming ? (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-center gap-2 text-green-500">
+                          <Radio className="w-4 h-4 animate-pulse" />
+                          <span className="text-sm font-medium">Streaming to partner...</span>
+                        </div>
+                        <Button 
+                          onClick={handleStopStreaming} 
+                          variant="destructive" 
+                          size="sm"
+                          className="w-full"
+                        >
+                          Stop Streaming
+                        </Button>
+                      </div>
+                    ) : null}
+                  </div>
+                )}
+                
+                {isReceiving && (
+                  <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
+                    <div className="flex items-center justify-center gap-2 text-green-500">
+                      <MonitorPlay className="w-5 h-5" />
+                      <span className="font-medium">Receiving partner's stream</span>
+                    </div>
+                  </div>
+                )}
+                
+                <p className="text-sm text-muted-foreground">
+                  Local files stream directly to your partner via P2P - no upload needed!
                 </p>
               </div>
-              
-              {currentFile && (
-                <div className="text-center space-y-2">
-                  <p className="text-sm text-muted-foreground">
-                    Current: {currentFile.name}
-                  </p>
-                  <div className="flex items-center justify-center gap-2">
-                    <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">
-                      {currentMediaType.toUpperCase()}
-                    </span>
-                  </div>
-                </div>
-              )}
             </TabsContent>
 
             <TabsContent value="url" className="space-y-4">
