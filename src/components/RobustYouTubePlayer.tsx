@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Play, AlertCircle, RefreshCw } from 'lucide-react';
+import { Play, AlertCircle, RefreshCw, ExternalLink } from 'lucide-react';
 
 interface RobustYouTubePlayerProps {
   videoId: string;
@@ -38,10 +38,21 @@ export const RobustYouTubePlayer: React.FC<RobustYouTubePlayerProps> = ({
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const playIntervalRef = useRef<number | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const apiCheckRef = useRef<NodeJS.Timeout | null>(null);
   
   const [status, setStatus] = useState<'loading' | 'ready' | 'fallback' | 'error'>('loading');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [autoplayBlocked, setAutoplayBlocked] = useState(false);
+
+  // Get proper origin for localhost support
+  const getOrigin = useCallback(() => {
+    const origin = window.location.origin;
+    // For localhost, use the full origin including port
+    if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+      return origin;
+    }
+    return origin;
+  }, []);
 
   // Cleanup function
   const cleanup = useCallback(() => {
@@ -52,6 +63,10 @@ export const RobustYouTubePlayer: React.FC<RobustYouTubePlayerProps> = ({
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
       timeoutRef.current = null;
+    }
+    if (apiCheckRef.current) {
+      clearInterval(apiCheckRef.current);
+      apiCheckRef.current = null;
     }
   }, []);
 
@@ -118,6 +133,34 @@ export const RobustYouTubePlayer: React.FC<RobustYouTubePlayerProps> = ({
     return controls;
   }, []);
 
+  // Use fallback iframe embed
+  const useFallback = useCallback(() => {
+    console.log('[YT] Using iframe fallback');
+    
+    if (!containerRef.current) return;
+    
+    containerRef.current.innerHTML = '';
+    
+    const origin = getOrigin();
+    const iframe = document.createElement('iframe');
+    iframe.src = `https://www.youtube.com/embed/${videoId}?enablejsapi=1&origin=${encodeURIComponent(origin)}&playsinline=1&rel=0&modestbranding=1&autoplay=0`;
+    iframe.width = '100%';
+    iframe.height = '100%';
+    iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
+    iframe.allowFullscreen = true;
+    iframe.style.border = 'none';
+    
+    containerRef.current.appendChild(iframe);
+    iframeRef.current = iframe;
+    
+    setStatus('fallback');
+    onDurationChange?.(0);
+    
+    const controls = createControls(null, true);
+    onReadyControls?.(controls);
+    onReady?.();
+  }, [videoId, getOrigin, createControls, onDurationChange, onReady, onReadyControls]);
+
   // Initialize with API or fallback
   useEffect(() => {
     if (!videoId || !containerRef.current) return;
@@ -137,9 +180,17 @@ export const RobustYouTubePlayer: React.FC<RobustYouTubePlayerProps> = ({
           playerRef.current = null;
         }
 
-        console.log('[YT] Creating player for:', videoId);
+        // Clear container
+        containerRef.current.innerHTML = '';
+        
+        // Create a new div for the player
+        const playerDiv = document.createElement('div');
+        playerDiv.id = `yt-player-${videoId}-${Date.now()}`;
+        containerRef.current.appendChild(playerDiv);
 
-        playerRef.current = new window.YT.Player(containerRef.current, {
+        console.log('[YT] Creating player for:', videoId, 'origin:', getOrigin());
+
+        playerRef.current = new window.YT.Player(playerDiv, {
           videoId,
           width: '100%',
           height: '100%',
@@ -147,11 +198,12 @@ export const RobustYouTubePlayer: React.FC<RobustYouTubePlayerProps> = ({
             autoplay: 0,
             controls: 1,
             enablejsapi: 1,
-            origin: window.location.origin,
+            origin: getOrigin(),
             rel: 0,
             modestbranding: 1,
             playsinline: 1,
-            iv_load_policy: 3
+            iv_load_policy: 3,
+            fs: 1
           },
           events: {
             onReady: (event: any) => {
@@ -212,34 +264,9 @@ export const RobustYouTubePlayer: React.FC<RobustYouTubePlayerProps> = ({
       }
     };
 
-    const useFallback = () => {
-      console.log('[YT] Using iframe fallback');
-      
-      if (!containerRef.current) return;
-      
-      containerRef.current.innerHTML = '';
-      
-      const iframe = document.createElement('iframe');
-      iframe.src = `https://www.youtube.com/embed/${videoId}?enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}&playsinline=1&rel=0&modestbranding=1`;
-      iframe.width = '100%';
-      iframe.height = '100%';
-      iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
-      iframe.allowFullscreen = true;
-      iframe.style.border = 'none';
-      
-      containerRef.current.appendChild(iframe);
-      iframeRef.current = iframe;
-      
-      setStatus('fallback');
-      onDurationChange?.(0);
-      
-      const controls = createControls(null, true);
-      onReadyControls?.(controls);
-      onReady?.();
-    };
-
     // Check if API is ready
     if (window.YT && typeof window.YT.Player === 'function') {
+      console.log('[YT] API already loaded, initializing player');
       initPlayer();
     } else {
       // Load API with timeout
@@ -254,17 +281,40 @@ export const RobustYouTubePlayer: React.FC<RobustYouTubePlayerProps> = ({
       // Set up callback
       const prevCallback = window.onYouTubeIframeAPIReady;
       window.onYouTubeIframeAPIReady = () => {
+        console.log('[YT] API ready callback fired');
         prevCallback?.();
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+          timeoutRef.current = null;
+        }
         initPlayer();
       };
 
-      // 3-second timeout for fallback
+      // Poll for API readiness (backup)
+      apiCheckRef.current = setInterval(() => {
+        if (window.YT && typeof window.YT.Player === 'function') {
+          console.log('[YT] API detected via polling');
+          clearInterval(apiCheckRef.current!);
+          apiCheckRef.current = null;
+          if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+            timeoutRef.current = null;
+          }
+          initPlayer();
+        }
+      }, 200);
+
+      // 5-second timeout for fallback (increased from 3s)
       timeoutRef.current = setTimeout(() => {
         if (status === 'loading') {
           console.log('[YT] API timeout, using fallback');
+          if (apiCheckRef.current) {
+            clearInterval(apiCheckRef.current);
+            apiCheckRef.current = null;
+          }
           useFallback();
         }
-      }, 3000);
+      }, 5000);
     }
 
     return () => {
@@ -274,7 +324,7 @@ export const RobustYouTubePlayer: React.FC<RobustYouTubePlayerProps> = ({
         playerRef.current = null;
       }
     };
-  }, [videoId, cleanup, createControls, onDurationChange, onError, onPlaybackUpdate, onReady, onReadyControls]);
+  }, [videoId, cleanup, createControls, getOrigin, onDurationChange, onError, onPlaybackUpdate, onReady, onReadyControls, useFallback, status]);
 
   // Handle autoplay unlock
   const handleUnlockAutoplay = () => {
@@ -301,6 +351,11 @@ export const RobustYouTubePlayer: React.FC<RobustYouTubePlayerProps> = ({
     }
   };
 
+  // Open in YouTube
+  const handleOpenInYouTube = () => {
+    window.open(`https://www.youtube.com/watch?v=${videoId}`, '_blank');
+  };
+
   return (
     <Card className="overflow-hidden">
       <CardContent className="p-0">
@@ -311,6 +366,10 @@ export const RobustYouTubePlayer: React.FC<RobustYouTubePlayerProps> = ({
               <div className="text-center text-white">
                 <div className="w-8 h-8 border-4 border-red-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
                 <p>Loading YouTube player...</p>
+                <p className="text-sm text-muted-foreground mt-2">
+                  {window.location.hostname.includes('localhost') && 
+                    'Localhost mode - using compatible settings'}
+                </p>
               </div>
             </div>
           )}
@@ -321,10 +380,16 @@ export const RobustYouTubePlayer: React.FC<RobustYouTubePlayerProps> = ({
               <div className="text-center text-white space-y-4 p-6">
                 <AlertCircle className="w-12 h-12 mx-auto text-red-500" />
                 <p className="font-medium">{errorMessage || 'Failed to load video'}</p>
-                <Button onClick={handleRetry} variant="outline" className="gap-2">
-                  <RefreshCw className="w-4 h-4" />
-                  Try Again
-                </Button>
+                <div className="flex gap-2 justify-center">
+                  <Button onClick={handleRetry} variant="outline" className="gap-2">
+                    <RefreshCw className="w-4 h-4" />
+                    Try Again
+                  </Button>
+                  <Button onClick={handleOpenInYouTube} variant="secondary" className="gap-2">
+                    <ExternalLink className="w-4 h-4" />
+                    Open in YouTube
+                  </Button>
+                </div>
               </div>
             </div>
           )}
@@ -360,6 +425,12 @@ export const RobustYouTubePlayer: React.FC<RobustYouTubePlayerProps> = ({
                   : 'Loading...'}
               </p>
             </div>
+            {status === 'fallback' && (
+              <Button onClick={handleRetry} variant="ghost" size="sm" className="gap-2">
+                <RefreshCw className="w-4 h-4" />
+                Retry API
+              </Button>
+            )}
           </div>
         </div>
       </CardContent>
