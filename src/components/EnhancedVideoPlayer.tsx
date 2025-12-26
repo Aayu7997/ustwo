@@ -714,12 +714,18 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
           {isReceiving && remoteStream && (
             <div className="w-full relative">
               <video
-                ref={remoteVideoRef}
+                ref={(el) => {
+                  if (el && remoteStream) {
+                    el.srcObject = remoteStream;
+                    el.play().catch(e => console.log('[Stream] Autoplay blocked:', e));
+                  }
+                }}
                 autoPlay
                 playsInline
+                controls
                 className="w-full aspect-video object-contain"
               />
-              <div className="absolute top-4 left-4 bg-green-500/90 text-white px-3 py-1 rounded-full text-sm font-medium flex items-center gap-2">
+              <div className="absolute top-4 left-4 bg-green-500/90 text-white px-3 py-1 rounded-full text-sm font-medium flex items-center gap-2 z-10">
                 <Radio className="w-4 h-4 animate-pulse" />
                 Live from Partner
               </div>
