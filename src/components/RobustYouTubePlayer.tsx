@@ -170,8 +170,12 @@ export const RobustYouTubePlayer: React.FC<RobustYouTubePlayerProps> = ({
     setErrorMessage(null);
     setAutoplayBlocked(false);
 
+    let mounted = true;
+    let playerInitialized = false;
+
     const initPlayer = () => {
-      if (!containerRef.current) return;
+      if (!containerRef.current || !mounted || playerInitialized) return;
+      playerInitialized = true;
 
       try {
         // Destroy existing player
@@ -188,7 +192,8 @@ export const RobustYouTubePlayer: React.FC<RobustYouTubePlayerProps> = ({
         playerDiv.id = `yt-player-${videoId}-${Date.now()}`;
         containerRef.current.appendChild(playerDiv);
 
-        console.log('[YT] Creating player for:', videoId, 'origin:', getOrigin());
+        const origin = getOrigin();
+        console.log('[YT] Creating player for:', videoId, 'origin:', origin);
 
         playerRef.current = new window.YT.Player(playerDiv, {
           videoId,
@@ -198,7 +203,7 @@ export const RobustYouTubePlayer: React.FC<RobustYouTubePlayerProps> = ({
             autoplay: 0,
             controls: 1,
             enablejsapi: 1,
-            origin: getOrigin(),
+            origin: origin,
             rel: 0,
             modestbranding: 1,
             playsinline: 1,
@@ -207,6 +212,7 @@ export const RobustYouTubePlayer: React.FC<RobustYouTubePlayerProps> = ({
           },
           events: {
             onReady: (event: any) => {
+              if (!mounted) return;
               console.log('[YT] Player ready');
               setStatus('ready');
               
@@ -218,6 +224,7 @@ export const RobustYouTubePlayer: React.FC<RobustYouTubePlayerProps> = ({
               onReady?.();
             },
             onStateChange: (event: any) => {
+              if (!mounted) return;
               const player = event.target;
               const state = event.data;
 
@@ -230,7 +237,7 @@ export const RobustYouTubePlayer: React.FC<RobustYouTubePlayerProps> = ({
                 onPlaybackUpdate?.(player.getCurrentTime(), true);
                 playIntervalRef.current = window.setInterval(() => {
                   try {
-                    onPlaybackUpdate?.(player.getCurrentTime(), true);
+                    if (mounted) onPlaybackUpdate?.(player.getCurrentTime(), true);
                   } catch {}
                 }, 500);
               } else if (state === window.YT.PlayerState.PAUSED) {
@@ -240,6 +247,7 @@ export const RobustYouTubePlayer: React.FC<RobustYouTubePlayerProps> = ({
               }
             },
             onError: (event: any) => {
+              if (!mounted) return;
               const errorCode = event.data;
               console.error('[YT] Player error:', errorCode);
               
@@ -260,6 +268,17 @@ export const RobustYouTubePlayer: React.FC<RobustYouTubePlayerProps> = ({
         });
       } catch (error) {
         console.error('[YT] Failed to create player:', error);
+        if (mounted) useFallback();
+      }
+    };
+
+    const triggerFallback = () => {
+      if (mounted && !playerInitialized) {
+        console.log('[YT] API timeout, using fallback');
+        if (apiCheckRef.current) {
+          clearInterval(apiCheckRef.current);
+          apiCheckRef.current = null;
+        }
         useFallback();
       }
     };
@@ -287,7 +306,7 @@ export const RobustYouTubePlayer: React.FC<RobustYouTubePlayerProps> = ({
           clearTimeout(timeoutRef.current);
           timeoutRef.current = null;
         }
-        initPlayer();
+        if (mounted && !playerInitialized) initPlayer();
       };
 
       // Poll for API readiness (backup)
@@ -300,31 +319,23 @@ export const RobustYouTubePlayer: React.FC<RobustYouTubePlayerProps> = ({
             clearTimeout(timeoutRef.current);
             timeoutRef.current = null;
           }
-          initPlayer();
+          if (mounted && !playerInitialized) initPlayer();
         }
       }, 200);
 
-      // 5-second timeout for fallback (increased from 3s)
-      timeoutRef.current = setTimeout(() => {
-        if (status === 'loading') {
-          console.log('[YT] API timeout, using fallback');
-          if (apiCheckRef.current) {
-            clearInterval(apiCheckRef.current);
-            apiCheckRef.current = null;
-          }
-          useFallback();
-        }
-      }, 5000);
+      // 5-second timeout for fallback
+      timeoutRef.current = setTimeout(triggerFallback, 5000);
     }
 
     return () => {
+      mounted = false;
       cleanup();
       if (playerRef.current) {
         try { playerRef.current.destroy(); } catch {}
         playerRef.current = null;
       }
     };
-  }, [videoId, cleanup, createControls, getOrigin, onDurationChange, onError, onPlaybackUpdate, onReady, onReadyControls, useFallback, status]);
+  }, [videoId]); // Only depend on videoId - removed status to prevent loops
 
   // Handle autoplay unlock
   const handleUnlockAutoplay = () => {
