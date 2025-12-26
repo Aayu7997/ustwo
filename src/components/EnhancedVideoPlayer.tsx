@@ -733,15 +733,17 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
           )}
           
           {/* YouTube Player with RobustYouTubePlayer */}
-          {!isReceiving && currentMediaType === 'youtube' && youtubeVideoId ? (
+          {!isReceiving && currentMediaType === 'youtube' && youtubeVideoId && (
             <div className="w-full">
               <RobustYouTubePlayer 
                 videoId={youtubeVideoId}
                 onPlaybackUpdate={(time, playing) => {
                   setCurrentTime(time);
                   setIsPlaying(playing);
-                  if (enableSync && playing) {
+                  // Always send sync for both play AND pause
+                  if (enableSync) {
                     sendPlaybackState(time, playing);
+                    broadcastSync(playing ? 'play' : 'pause', time, playing);
                   }
                 }}
                 onDurationChange={(d) => setDuration(d)}
@@ -756,6 +758,7 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
                         ytControlsRef.current.seekTo(time);
                       }
                       if (playing) ytControlsRef.current.play();
+                      else ytControlsRef.current.pause();
                     }
                     pendingSyncRef.current = null;
                   }
@@ -768,15 +771,19 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
                 }}
               />
             </div>
-          ) : !isReceiving && currentMediaType === 'vimeo' ? (
+          )}
+
+          {/* Vimeo Player */}
+          {!isReceiving && currentMediaType === 'vimeo' && (
             <div className="w-full">
               <VimeoPlayer 
                 videoId={videoSrc}
                 onPlaybackUpdate={(time, playing) => {
                   setCurrentTime(time);
                   setIsPlaying(playing);
-                  if (enableSync && playing) {
+                  if (enableSync) {
                     sendPlaybackState(time, playing);
+                    broadcastSync(playing ? 'play' : 'pause', time, playing);
                   }
                 }}
                 onDurationChange={(d) => setDuration(d)}
@@ -795,7 +802,10 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
                 }}
               />
             </div>
-          ) : !isReceiving ? (
+          )}
+
+          {/* Native Video Player for local/url/hls/storage */}
+          {!isReceiving && currentMediaType !== 'youtube' && currentMediaType !== 'vimeo' && (
             <div className="relative w-full">
               <video
                 ref={videoRef}
@@ -810,13 +820,11 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
                   if (hlsRef.current) { try { hlsRef.current.destroy(); } catch {} hlsRef.current = null; }
                   if (!videoSrc) return;
                   
-                  // Try to refresh signed URL for storage videos
                   if (currentMediaType === 'storage') {
                     toast({
                       title: 'Playback Error',
                       description: 'Video URL expired. Refreshing...',
                     });
-                    // The partner sync will handle re-fetching
                     return;
                   }
                   
@@ -854,7 +862,7 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
                 </div>
               )}
             </div>
-          ) : null}
+          )}
           
           {/* Loading Overlay */}
           {(isLoading || isUploading) && (
