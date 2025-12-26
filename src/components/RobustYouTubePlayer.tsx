@@ -234,6 +234,7 @@ export const RobustYouTubePlayer: React.FC<RobustYouTubePlayerProps> = ({
               }
 
               if (state === window.YT.PlayerState.PLAYING) {
+                // Send update immediately and then every 500ms
                 onPlaybackUpdate?.(player.getCurrentTime(), true);
                 playIntervalRef.current = window.setInterval(() => {
                   try {
@@ -241,8 +242,12 @@ export const RobustYouTubePlayer: React.FC<RobustYouTubePlayerProps> = ({
                   } catch {}
                 }, 500);
               } else if (state === window.YT.PlayerState.PAUSED) {
+                // Always broadcast pause state immediately
                 onPlaybackUpdate?.(player.getCurrentTime(), false);
               } else if (state === window.YT.PlayerState.ENDED) {
+                onPlaybackUpdate?.(player.getCurrentTime(), false);
+              } else if (state === window.YT.PlayerState.BUFFERING) {
+                // Send current time during buffering to help sync
                 onPlaybackUpdate?.(player.getCurrentTime(), false);
               }
             },
