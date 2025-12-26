@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from '@/hooks/use-toast';
 import { 
   Play, 
@@ -28,7 +29,8 @@ import {
   FileText,
   Loader2,
   Radio,
-  MonitorPlay
+  MonitorPlay,
+  Search
 } from 'lucide-react';
 import Hls from 'hls.js';
 import { useRealtimeSync } from '@/hooks/useRealtimeSync';
@@ -39,6 +41,7 @@ import { useVideoQuality } from '@/hooks/useVideoQuality';
 import { VIDEO_QUALITY_PRESETS, VideoQuality } from '@/utils/videoQuality';
 import { useMediaSync } from '@/hooks/useMediaSync';
 import { useMediaStreaming } from '@/hooks/useMediaStreaming';
+import { useYouTubeAPI, YouTubeSearchResult } from '@/hooks/useYouTubeAPI';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -110,6 +113,16 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
     stopStreaming,
     syncPlaybackState: syncStreamPlayback
   } = useMediaStreaming({ roomId, roomCode, enabled: enableLiveStream });
+
+  // YouTube API hook
+  const {
+    isLoading: isSearching,
+    searchResults,
+    searchVideos,
+    clearResults
+  } = useYouTubeAPI();
+  
+  const [youtubeSearchQuery, setYoutubeSearchQuery] = useState('');
 
   // Media sync hook for storage-based file sharing
   const {
@@ -697,8 +710,24 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
     >
       <Card className="overflow-hidden">
         <div className="relative bg-black">
+          {/* Remote Stream View - When receiving partner's stream */}
+          {isReceiving && remoteStream && (
+            <div className="w-full relative">
+              <video
+                ref={remoteVideoRef}
+                autoPlay
+                playsInline
+                className="w-full aspect-video object-contain"
+              />
+              <div className="absolute top-4 left-4 bg-green-500/90 text-white px-3 py-1 rounded-full text-sm font-medium flex items-center gap-2">
+                <Radio className="w-4 h-4 animate-pulse" />
+                Live from Partner
+              </div>
+            </div>
+          )}
+          
           {/* YouTube Player with RobustYouTubePlayer */}
-          {currentMediaType === 'youtube' && youtubeVideoId ? (
+          {!isReceiving && currentMediaType === 'youtube' && youtubeVideoId ? (
             <div className="w-full">
               <RobustYouTubePlayer 
                 videoId={youtubeVideoId}
@@ -733,7 +762,7 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
                 }}
               />
             </div>
-          ) : currentMediaType === 'vimeo' ? (
+          ) : !isReceiving && currentMediaType === 'vimeo' ? (
             <div className="w-full">
               <VimeoPlayer 
                 videoId={videoSrc}
@@ -760,7 +789,7 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
                 }}
               />
             </div>
-          ) : (
+          ) : !isReceiving ? (
             <div className="relative w-full">
               <video
                 ref={videoRef}
@@ -819,7 +848,7 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
                 </div>
               )}
             </div>
-          )}
+          ) : null}
           
           {/* Loading Overlay */}
           {(isLoading || isUploading) && (
@@ -1053,20 +1082,89 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
             </TabsContent>
 
             <TabsContent value="youtube" className="space-y-4">
+              {/* Direct URL */}
               <div className="space-y-2">
                 <Label htmlFor="youtube-url">YouTube URL</Label>
-                <Input
-                  id="youtube-url"
-                  type="url"
-                  placeholder="https://www.youtube.com/watch?v=..."
-                  value={youtubeUrl}
-                  onChange={(e) => setYoutubeUrl(e.target.value)}
-                />
+                <div className="flex gap-2">
+                  <Input
+                    id="youtube-url"
+                    type="url"
+                    placeholder="https://www.youtube.com/watch?v=..."
+                    value={youtubeUrl}
+                    onChange={(e) => setYoutubeUrl(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Button onClick={handleYouTubeLoad} disabled={isLoading}>
+                    <Youtube className="w-4 h-4" />
+                  </Button>
+                </div>
               </div>
-              <Button onClick={handleYouTubeLoad} className="w-full">
-                <Youtube className="w-4 h-4 mr-2" />
-                Load YouTube Video
-              </Button>
+              
+              {/* Search */}
+              <div className="space-y-2">
+                <Label htmlFor="youtube-search">Search YouTube</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="youtube-search"
+                    placeholder="Search for videos..."
+                    value={youtubeSearchQuery}
+                    onChange={(e) => setYoutubeSearchQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        searchVideos(youtubeSearchQuery);
+                      }
+                    }}
+                    className="flex-1"
+                  />
+                  <Button 
+                    onClick={() => searchVideos(youtubeSearchQuery)} 
+                    disabled={isSearching || !youtubeSearchQuery.trim()}
+                  >
+                    {isSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                  </Button>
+                </div>
+              </div>
+              
+              {/* Search Results */}
+              {searchResults.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label>Search Results</Label>
+                    <Button variant="ghost" size="sm" onClick={clearResults}>
+                      Clear
+                    </Button>
+                  </div>
+                  <ScrollArea className="h-64">
+                    <div className="space-y-2 pr-4">
+                      {searchResults.map((result) => (
+                        <button
+                          key={result.id}
+                          onClick={async () => {
+                            setYoutubeVideoId(result.id);
+                            setCurrentMediaType('youtube');
+                            setVideoSrc('');
+                            playerReadyRef.current = false;
+                            await syncMediaSource(result.id, 'youtube');
+                            toast({ title: 'Loading video', description: result.title });
+                            clearResults();
+                          }}
+                          className="w-full flex gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors text-left"
+                        >
+                          <img 
+                            src={result.thumbnail} 
+                            alt={result.title}
+                            className="w-24 h-16 object-cover rounded"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm line-clamp-2">{result.title}</p>
+                            <p className="text-xs text-muted-foreground mt-1">{result.channelTitle}</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </div>
+              )}
             </TabsContent>
 
             <TabsContent value="subtitles" className="space-y-4">

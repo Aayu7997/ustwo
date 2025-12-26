@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.media-proxy]
 verify_jwt = false
+
+[functions.youtube-api]
+verify_jwt = false
