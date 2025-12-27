@@ -38,10 +38,13 @@ export const useRealtimeSync = ({ roomId, onPlaybackUpdate, onMediaSync, onSyncE
           filter: `room_id=eq.${roomId}`
         },
         (payload) => {
-          console.log('Playback state updated:', payload);
           const newState = payload.new as PlaybackState;
+          // Skip updates that we sent ourselves
+          if (newState.last_updated_by === user?.id) return;
+
+          console.log('Playback state updated from partner:', newState);
           onPlaybackUpdate(newState);
-          onMediaSync(newState.current_time_seconds, newState.is_playing);
+          onMediaSync(newState.current_time_seconds ?? 0, newState.is_playing ?? false);
         }
       )
       .on(
@@ -53,10 +56,13 @@ export const useRealtimeSync = ({ roomId, onPlaybackUpdate, onMediaSync, onSyncE
           filter: `room_id=eq.${roomId}`
         },
         (payload) => {
-          console.log('Playback state inserted:', payload);
           const newState = payload.new as PlaybackState;
+          // Skip updates that we sent ourselves
+          if (newState.last_updated_by === user?.id) return;
+
+          console.log('Playback state inserted from partner:', newState);
           onPlaybackUpdate(newState);
-          onMediaSync(newState.current_time_seconds, newState.is_playing);
+          onMediaSync(newState.current_time_seconds ?? 0, newState.is_playing ?? false);
         }
       )
       .on('broadcast', { event: 'sync_event' }, (payload) => {
@@ -78,7 +84,7 @@ export const useRealtimeSync = ({ roomId, onPlaybackUpdate, onMediaSync, onSyncE
         supabase.removeChannel(channelRef.current);
       }
     };
-  }, [roomId, onPlaybackUpdate, onMediaSync]);
+  }, [roomId, onPlaybackUpdate, onMediaSync, onSyncEvent, user?.id]);
 
   const sendPlaybackUpdate = async (currentTime: number, isPlaying: boolean) => {
     try {
@@ -87,6 +93,7 @@ export const useRealtimeSync = ({ roomId, onPlaybackUpdate, onMediaSync, onSyncE
         .update({
           current_time_seconds: currentTime,
           is_playing: isPlaying,
+          last_updated_by: user?.id ?? null,
           updated_at: new Date().toISOString()
         }, { count: 'exact' })
         .eq('room_id', roomId);
