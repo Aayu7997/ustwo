@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import ReactDOM from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRobustWebRTC } from '@/hooks/useRobustWebRTC';
 import { useVideoPiP } from '@/hooks/useVideoPiP';
@@ -16,7 +17,9 @@ import {
   X,
   Move,
   Phone,
-  RefreshCw
+  RefreshCw,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -48,6 +51,7 @@ export const EnhancedVideoCallOverlay: React.FC<EnhancedVideoCallOverlayProps> =
 
   const [isAudioEnabled, setIsAudioEnabled] = useState(true);
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
+  const [isHidden, setIsHidden] = useState(false); // hidden but active (audio continues)
 
   const {
     localVideoRef,
@@ -126,7 +130,31 @@ export const EnhancedVideoCallOverlay: React.FC<EnhancedVideoCallOverlayProps> =
     }
   };
 
+  // Keep audio tracks running even when hidden
   if (!isActive) return null;
+
+  // Hidden mode for voice-only: audio keeps running but no UI
+  if (isHidden && voiceOnly) {
+    // Render a minimal floating bar so user can bring it back
+    return ReactDOM.createPortal(
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="fixed bottom-4 right-4 z-[100000]"
+      >
+        <Button
+          size="sm"
+          variant="secondary"
+          className="flex items-center gap-2"
+          onClick={() => setIsHidden(false)}
+        >
+          <EyeOff className="w-4 h-4" />
+          Voice Call Active - Tap to Show
+        </Button>
+      </motion.div>,
+      document.body
+    );
+  }
 
   const getPositionStyles = () => {
     if (position === 'custom') {
@@ -158,6 +186,13 @@ export const EnhancedVideoCallOverlay: React.FC<EnhancedVideoCallOverlayProps> =
     }
   };
 
+  // Toggle hide for voice-only mode
+  const toggleHidden = () => {
+    if (voiceOnly) {
+      setIsHidden(!isHidden);
+    }
+  };
+
   const getQualityColor = () => {
     switch (connectionQuality) {
       case 'excellent': return 'bg-green-500';
@@ -169,7 +204,8 @@ export const EnhancedVideoCallOverlay: React.FC<EnhancedVideoCallOverlayProps> =
 
   const isMinimized = mode === 'minimized';
 
-  return (
+  // Use a portal so overlay appears above fullscreen elements
+  return ReactDOM.createPortal(
     <AnimatePresence>
       <motion.div
         initial={{ opacity: 0, scale: 0.8 }}
@@ -177,7 +213,8 @@ export const EnhancedVideoCallOverlay: React.FC<EnhancedVideoCallOverlayProps> =
         exit={{ opacity: 0, scale: 0.8 }}
         style={getPositionStyles()}
         className={cn(
-          'fixed z-50',
+          // Use a very high z-index to appear above fullscreen video
+          'fixed z-[100000]',
           getSizeClasses(),
           isDragging && 'cursor-grabbing'
         )}
@@ -198,6 +235,17 @@ export const EnhancedVideoCallOverlay: React.FC<EnhancedVideoCallOverlayProps> =
                 </span>
               </div>
               <div className="flex items-center gap-1">
+                {/* Hide button for voice-only */}
+                {voiceOnly && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={toggleHidden}
+                    className="h-8 w-8 text-white hover:bg-white/20"
+                  >
+                    <EyeOff className="w-3 h-3" />
+                  </Button>
+                )}
                 <Button
                   variant="ghost"
                   size="icon"
@@ -319,7 +367,7 @@ export const EnhancedVideoCallOverlay: React.FC<EnhancedVideoCallOverlayProps> =
                 </div>
               )}
 
-              {/* Controls */}
+          {/* Controls */}
               <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1">
@@ -355,6 +403,17 @@ export const EnhancedVideoCallOverlay: React.FC<EnhancedVideoCallOverlayProps> =
                   </div>
 
                   <div className="flex items-center gap-1">
+                    {/* Hide button for voice-only */}
+                    {voiceOnly && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={toggleHidden}
+                        className="h-8 w-8 text-white hover:bg-white/20 rounded-full"
+                      >
+                        <EyeOff className="w-3 h-3" />
+                      </Button>
+                    )}
                     <Button
                       variant="ghost"
                       size="icon"
@@ -379,6 +438,7 @@ export const EnhancedVideoCallOverlay: React.FC<EnhancedVideoCallOverlayProps> =
           )}
         </Card>
       </motion.div>
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 };
