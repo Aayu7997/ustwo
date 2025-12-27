@@ -80,34 +80,28 @@ export const useMediaStreaming = ({ roomId, roomCode, enabled = true }: UseMedia
     
     const peer = new SimplePeer({
       initiator,
-      trickle: true,
+      // Use non-trickle signaling to avoid partial/duplicate candidate races
+      // and keep DB signaling simple & reliable.
+      trickle: false,
       stream: stream || undefined,
       config: { iceServers: ICE_SERVERS }
     });
 
     peer.on('signal', async (signal) => {
-      console.log('[MediaStreaming] Signal generated:', signal.type);
-      
+      console.log('[MediaStreaming] Signal generated:', (signal as any)?.type ?? 'signal');
+
       if (!roomId || !user?.id) return;
-      
+
       try {
-        // Clear old signals from this user first
-        await supabase
-          .from('rtc_signaling')
-          .delete()
-          .eq('room_id', roomId)
-          .eq('sender', user.id)
-          .eq('type', 'stream_signal');
-        
-        await supabase
-          .from('rtc_signaling')
-          .insert({
-            room_id: roomId,
-            room_code: roomCode || roomId.substring(0, 6),
-            sender: user.id,
-            type: 'stream_signal',
-            payload: { signal, isStreamer: initiator }
-          });
+        // Store each signal as a row. We clean old rows at stream/join start,
+        // which avoids clearing mid-handshake.
+        await supabase.from('rtc_signaling').insert({
+          room_id: roomId,
+          room_code: roomCode || roomId.substring(0, 6),
+          sender: user.id,
+          type: 'stream_signal',
+          payload: { signal, isStreamer: initiator }
+        });
       } catch (error) {
         console.error('[MediaStreaming] Failed to send signal:', error);
       }
@@ -150,13 +144,15 @@ export const useMediaStreaming = ({ roomId, roomCode, enabled = true }: UseMedia
 
     peer.on('error', (err) => {
       console.error('[MediaStreaming] Peer error:', err);
-      setState(prev => ({ ...prev, connectionState: 'failed' }));
-      
+
       toast({
         title: "Streaming Error",
         description: "Connection failed. Try again.",
         variant: "destructive"
       });
+
+      // Reset UI so we don't end up with a blank "receiving" state.
+      cleanup();
     });
 
     return peer;
@@ -195,6 +191,18 @@ export const useMediaStreaming = ({ roomId, roomCode, enabled = true }: UseMedia
       
       console.log('[MediaStreaming] Captured stream:', capturedStream.getTracks().map(t => t.kind));
       streamRef.current = capturedStream;
+
+      // Clear our previous signals so the receiver doesn't apply stale offers.
+      try {
+        await supabase
+          .from('rtc_signaling')
+          .delete()
+          .eq('room_id', roomId)
+          .eq('sender', user.id)
+          .eq('type', 'stream_signal');
+      } catch (e) {
+        console.warn('[MediaStreaming] Failed to clear old signals (non-fatal):', e);
+      }
       
       // Broadcast that we're starting to stream
       if (channelRef.current) {
@@ -261,6 +269,18 @@ export const useMediaStreaming = ({ roomId, roomCode, enabled = true }: UseMedia
       streamerId
     }));
     
+    // Clear our previous receiver signals (prevents stale answers)
+    try {
+      await supabase
+        .from('rtc_signaling')
+        .delete()
+        .eq('room_id', roomId)
+        .eq('sender', user.id)
+        .eq('type', 'stream_signal');
+    } catch (e) {
+      console.warn('[MediaStreaming] Failed to clear old signals (non-fatal):', e);
+    }
+
     // Create peer as receiver (non-initiator)
     peerRef.current = createPeer(false);
     
