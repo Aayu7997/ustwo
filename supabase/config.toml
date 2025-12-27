@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.youtube-api]
 verify_jwt = false
+
+[functions.vimeo-oembed]
+verify_jwt = false
