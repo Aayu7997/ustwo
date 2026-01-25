@@ -223,33 +223,42 @@ export const RobustYouTubePlayer: React.FC<RobustYouTubePlayerProps> = ({
               onReadyControls?.(controls);
               onReady?.();
             },
-            onStateChange: (event: any) => {
-              if (!mounted) return;
-              const player = event.target;
-              const state = event.data;
+                            onStateChange: (event: any) => {
+                              if (!mounted) return;
+                              const player = event.target;
+                              const state = event.data;
 
-              if (playIntervalRef.current) {
-                clearInterval(playIntervalRef.current);
-                playIntervalRef.current = null;
-              }
+                              // Clear any existing interval
+                              if (playIntervalRef.current) {
+                                clearInterval(playIntervalRef.current);
+                                playIntervalRef.current = null;
+                              }
 
-              if (state === window.YT.PlayerState.PLAYING) {
-                // Send update immediately and then every 500ms
-                onPlaybackUpdate?.(player.getCurrentTime(), true);
-                playIntervalRef.current = window.setInterval(() => {
-                  try {
-                    if (mounted) onPlaybackUpdate?.(player.getCurrentTime(), true);
-                  } catch {}
-                }, 500);
-              } else if (state === window.YT.PlayerState.PAUSED) {
-                // Always broadcast pause state immediately
-                onPlaybackUpdate?.(player.getCurrentTime(), false);
-              } else if (state === window.YT.PlayerState.ENDED) {
-                onPlaybackUpdate?.(player.getCurrentTime(), false);
-              } else if (state === window.YT.PlayerState.BUFFERING) {
-                // Send current time during buffering to help sync
-                onPlaybackUpdate?.(player.getCurrentTime(), false);
-              }
+                              const currentTime = player.getCurrentTime?.() ?? 0;
+                              console.log('[YT] State changed:', state, 'time:', currentTime.toFixed(1));
+
+                              if (state === window.YT.PlayerState.PLAYING) {
+                                // Send update immediately
+                                onPlaybackUpdate?.(currentTime, true);
+                                // Then send periodic updates for sync
+                                playIntervalRef.current = window.setInterval(() => {
+                                  try {
+                                    if (mounted) {
+                                      const time = player.getCurrentTime?.() ?? 0;
+                                      onPlaybackUpdate?.(time, true);
+                                    }
+                                  } catch {}
+                                }, 400); // Slightly faster for better sync
+                              } else if (state === window.YT.PlayerState.PAUSED) {
+                                // CRITICAL: Send pause state immediately for real-time sync
+                                console.log('[YT] Sending PAUSE at:', currentTime.toFixed(1));
+                                onPlaybackUpdate?.(currentTime, false);
+                              } else if (state === window.YT.PlayerState.ENDED) {
+                                onPlaybackUpdate?.(currentTime, false);
+                              } else if (state === window.YT.PlayerState.BUFFERING) {
+                                // Don't send false during buffering - it causes glitches
+                                // Partner will catch up when playback resumes
+                              }
             },
             onError: (event: any) => {
               if (!mounted) return;
