@@ -15,10 +15,9 @@ import { SettingsTab } from '@/components/tabs/SettingsTab';
 import { FloatingHearts } from '@/components/FloatingHearts';
 import { ChatWidget } from '@/components/ChatWidget';
 import { WatchPartyEffects } from '@/components/WatchPartyEffects';
-
 import { PartnerPresence } from '@/components/PartnerPresence';
 import { Button } from '@/components/ui/button';
-import { Heart, ArrowLeft } from 'lucide-react';
+import { Heart, ArrowLeft, Loader2 } from 'lucide-react';
 import { useRoomPresence } from '@/hooks/useRoomPresence';
 
 type TabType = 'video' | 'notes' | 'calendar' | 'watchlist' | 'ai-movies' | 'love-meter' | 'themes' | 'settings';
@@ -48,35 +47,49 @@ const Room: React.FC = () => {
     setCurrentRoom(room);
   }, [room]);
 
+  // Loading state
   if (authLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">
-          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading room...</p>
-        </div>
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="text-center space-y-4"
+        >
+          <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto" />
+          <p className="text-muted-foreground">Loading your room...</p>
+        </motion.div>
       </div>
     );
   }
 
   if (!user) {
-    return null; // Will redirect to auth
+    return null;
   }
 
+  // Room not found
   if (!currentRoom) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center space-y-4">
-          <Heart className="w-12 h-12 text-muted-foreground mx-auto" />
-          <h2 className="text-2xl font-bold">Room not found</h2>
-          <p className="text-muted-foreground">
-            The room you're looking for doesn't exist or you don't have access to it.
-          </p>
-          <Button onClick={() => navigate('/')}>
-            <ArrowLeft className="w-4 h-4 mr-2" />
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center space-y-6 max-w-md"
+        >
+          <div className="w-20 h-20 mx-auto rounded-2xl bg-muted flex items-center justify-center">
+            <Heart className="w-10 h-10 text-muted-foreground" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-2xl font-bold">Room Not Found</h2>
+            <p className="text-muted-foreground">
+              This room doesn't exist or you don't have access to it.
+            </p>
+          </div>
+          <Button onClick={() => navigate('/')} className="gap-2">
+            <ArrowLeft className="w-4 h-4" />
             Go Home
           </Button>
-        </div>
+        </motion.div>
       </div>
     );
   }
@@ -84,48 +97,40 @@ const Room: React.FC = () => {
   const renderTabContent = () => {
     if (!roomId || !currentRoom) return null;
 
-    switch (activeTab) {
-      case 'video':
-        return (
-          <VideoTab
-            roomId={roomId}
-            roomCode={currentRoom.room_code}
-            onPlaybackStateChange={(state) => {
-              setPlaybackState({
-                isPlaying: state.is_playing || false,
-                currentTime: state.current_time_seconds || 0
-              });
-            }}
-          />
-        );
-      case 'notes':
-        return <NotesTab />;
-      case 'calendar':
-        return <CalendarTab roomId={roomId} partnerId={currentRoom.partner_id} />;
-      case 'watchlist':
-        return <WatchlistTab roomId={roomId} />;
-      case 'ai-movies':
-        return (
-          <AIMoviesTab
-            roomId={roomId}
-            roomCode={currentRoom.room_code || ''}
-            partnerId={currentRoom.partner_id}
-          />
-        );
-      case 'love-meter':
-        return <LoveMeterTab partnerId={currentRoom.partner_id} />;
-      case 'themes':
-        return <ThemesTab />;
-      case 'settings':
-        return <SettingsTab roomId={roomId} roomCode={currentRoom.room_code || ''} />;
-      default:
-        return null;
-    }
+    const tabComponents: Record<TabType, React.ReactNode> = {
+      video: (
+        <VideoTab
+          roomId={roomId}
+          roomCode={currentRoom.room_code}
+          onPlaybackStateChange={(state) => {
+            setPlaybackState({
+              isPlaying: state.is_playing || false,
+              currentTime: state.current_time_seconds || 0
+            });
+          }}
+        />
+      ),
+      notes: <NotesTab />,
+      calendar: <CalendarTab roomId={roomId} partnerId={currentRoom.partner_id} />,
+      watchlist: <WatchlistTab roomId={roomId} />,
+      'ai-movies': (
+        <AIMoviesTab
+          roomId={roomId}
+          roomCode={currentRoom.room_code || ''}
+          partnerId={currentRoom.partner_id}
+        />
+      ),
+      'love-meter': <LoveMeterTab partnerId={currentRoom.partner_id} />,
+      themes: <ThemesTab />,
+      settings: <SettingsTab roomId={roomId} roomCode={currentRoom.room_code || ''} />,
+    };
+
+    return tabComponents[activeTab];
   };
 
   return (
-    <div className="min-h-screen bg-background flex">
-      {/* Sidebar Navigation */}
+    <div className="min-h-screen bg-background">
+      {/* Sidebar */}
       <RoomSidebar
         activeTab={activeTab}
         onTabChange={setActiveTab}
@@ -140,16 +145,16 @@ const Room: React.FC = () => {
         initial={{ opacity: 0 }}
         animate={{ 
           opacity: 1,
-          marginLeft: sidebarCollapsed ? 80 : 280
+          marginLeft: sidebarCollapsed ? 72 : 260
         }}
         transition={{ duration: 0.3 }}
-        className="flex-1 min-h-screen overflow-y-auto"
+        className="min-h-screen"
       >
-        <div className="container mx-auto px-6 py-8 max-w-7xl">
-          {/* Partner Presence Indicator */}
+        <div className="p-6 lg:p-8 max-w-7xl">
+          {/* Partner Presence */}
           {roomId && (
             <motion.div
-              initial={{ opacity: 0, y: -20 }}
+              initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               className="mb-6"
             >
@@ -159,11 +164,16 @@ const Room: React.FC = () => {
 
           {/* Tab Content */}
           <AnimatePresence mode="wait">
-            <div key={activeTab}>
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+            >
               {renderTabContent()}
-            </div>
+            </motion.div>
           </AnimatePresence>
-
         </div>
       </motion.main>
       

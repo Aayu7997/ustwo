@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -7,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { Heart, Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import { Heart, Mail, Lock, Eye, EyeOff, Sparkles } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useGoogleAuth } from '@/hooks/useGoogleAuth';
 import { toast } from '@/hooks/use-toast';
@@ -72,25 +71,32 @@ const Auth: React.FC = () => {
 
   return (
     <div className="min-h-screen relative flex items-center justify-center overflow-hidden p-4">
-      {/* Animated Background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-pink-50 via-purple-50 to-indigo-50 dark:from-gray-900 dark:via-purple-900/20 dark:to-pink-900/20"></div>
-      
-      {/* Floating Hearts Animation */}
-      <div className="absolute inset-0 overflow-hidden">
-        {[...Array(12)].map((_, i) => (
+      {/* Background */}
+      <div className="absolute inset-0 bg-background">
+        {/* Gradient orbs */}
+        <div className="absolute top-0 left-0 w-full h-full overflow-hidden">
+          <div className="absolute -top-1/2 -left-1/4 w-[600px] h-[600px] bg-primary/10 rounded-full blur-3xl" />
+          <div className="absolute -bottom-1/2 -right-1/4 w-[600px] h-[600px] bg-love-purple/10 rounded-full blur-3xl" />
+          <div className="absolute top-1/4 right-1/4 w-[400px] h-[400px] bg-love-coral/5 rounded-full blur-3xl" />
+        </div>
+      </div>
+
+      {/* Floating Hearts */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {[...Array(8)].map((_, i) => (
           <motion.div
             key={i}
             className="absolute"
             initial={{
-              x: Math.random() * window.innerWidth,
-              y: window.innerHeight + 100,
+              x: Math.random() * 100 + '%',
+              y: '100%',
               rotate: 0,
-              scale: 0.5 + Math.random() * 0.5,
+              scale: 0.3 + Math.random() * 0.4,
+              opacity: 0.1 + Math.random() * 0.2,
             }}
             animate={{
-              y: -100,
+              y: '-20%',
               rotate: 360,
-              x: Math.random() * window.innerWidth,
             }}
             transition={{
               duration: 15 + Math.random() * 10,
@@ -98,74 +104,54 @@ const Auth: React.FC = () => {
               delay: Math.random() * 5,
               ease: "linear"
             }}
-            style={{
-              left: `${Math.random() * 100}%`,
-            }}
           >
             <Heart 
-              className={`w-4 h-4 text-pink-200 dark:text-pink-700 opacity-20`}
+              className="w-6 h-6 text-primary"
               fill="currentColor"
             />
           </motion.div>
         ))}
       </div>
 
-      {/* Gradient Orbs */}
-      <div className="absolute top-1/4 left-1/4 w-72 h-72 bg-gradient-to-r from-pink-300/30 to-purple-300/30 rounded-full blur-3xl animate-pulse"></div>
-      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-gradient-to-r from-purple-300/20 to-indigo-300/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
-      <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-gradient-to-r from-indigo-300/10 to-pink-300/10 rounded-full blur-3xl animate-pulse delay-2000"></div>
-      
-      {/* Geometric Patterns */}
-      <div className="absolute inset-0 opacity-5 dark:opacity-10">
-        <svg className="w-full h-full" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <pattern id="hearts" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
-              <path d="M10 15C7 12 1 12 1 8C1 5 3 3 6 3C8 3 9 4 10 6C11 4 12 3 14 3C17 3 19 5 19 8C19 12 13 12 10 15Z" fill="currentColor"/>
-            </pattern>
-          </defs>
-          <rect width="100%" height="100%" fill="url(#hearts)" className="text-pink-200 dark:text-pink-800"/>
-        </svg>
-      </div>
-
-      {/* Main Content */}
+      {/* Main Card */}
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
+        initial={{ opacity: 0, y: 20, scale: 0.95 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.5 }}
         className="relative z-10 w-full max-w-md"
       >
-        <Card className="shadow-2xl border-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border border-white/20 dark:border-gray-700/20">
-          <CardHeader className="text-center space-y-4">
+        <Card className="glass-strong border-0 shadow-2xl">
+          <CardHeader className="text-center space-y-4 pb-2">
             <motion.div
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
-              transition={{ delay: 0.2, type: "spring" }}
+              transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
               className="flex justify-center"
             >
-              <div className="w-16 h-16 bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 rounded-full flex items-center justify-center shadow-lg animate-pulse">
+              <div className="w-16 h-16 rounded-2xl bg-gradient-romantic flex items-center justify-center shadow-glow">
                 <Heart className="w-8 h-8 text-white" fill="currentColor" />
               </div>
             </motion.div>
-            <div>
-              <CardTitle className="text-2xl font-bold bg-gradient-to-r from-pink-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent">
-                {isLogin ? 'Welcome Back' : 'Join UsTwo'}
+            <div className="space-y-2">
+              <CardTitle className="text-2xl font-bold">
+                {isLogin ? 'Welcome Back' : 'Create Account'}
               </CardTitle>
-              <CardDescription className="mt-2">
+              <CardDescription>
                 {isLogin 
-                  ? 'Sign in to continue your romantic journey' 
-                  : 'Create your account to start watching together'
+                  ? 'Sign in to continue your journey together' 
+                  : 'Join UsTwo to watch movies with your partner'
                 }
               </CardDescription>
             </div>
           </CardHeader>
 
-          <CardContent className="space-y-6">
-            {/* Google Sign-in Button */}
+          <CardContent className="space-y-6 pt-4">
+            {/* Google Sign-in */}
             <Button
               onClick={signInWithGoogle}
               disabled={googleLoading || loading}
               variant="outline"
-              className="w-full h-11 flex items-center gap-3"
+              className="w-full h-12 gap-3 font-medium"
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24">
                 <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -179,8 +165,8 @@ const Auth: React.FC = () => {
             <div className="relative">
               <Separator />
               <span className="absolute inset-x-0 -top-2.5 flex justify-center">
-                <span className="bg-card px-2 text-xs text-muted-foreground">
-                  Or continue with email
+                <span className="bg-card px-3 text-xs text-muted-foreground">
+                  or continue with email
                 </span>
               </span>
             </div>
@@ -189,13 +175,13 @@ const Auth: React.FC = () => {
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
                     id="email"
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="pl-10"
+                    className="h-12 pl-10"
                     placeholder="your@email.com"
                     disabled={loading || googleLoading}
                   />
@@ -205,21 +191,21 @@ const Auth: React.FC = () => {
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
                     id="password"
                     type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="pl-10 pr-10"
-                    placeholder="Enter your password"
+                    className="h-12 pl-10 pr-10"
+                    placeholder="••••••••"
                     disabled={loading || googleLoading}
                   />
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="absolute right-0 top-0 h-full px-3"
+                    className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
                     onClick={() => setShowPassword(!showPassword)}
                     disabled={loading || googleLoading}
                   >
@@ -230,7 +216,7 @@ const Auth: React.FC = () => {
 
               <Button 
                 type="submit" 
-                className="w-full"
+                className="w-full h-12 bg-gradient-romantic hover:opacity-90 transition-opacity"
                 disabled={loading || googleLoading}
               >
                 {loading ? 'Please wait...' : isLogin ? 'Sign In' : 'Create Account'}
@@ -239,10 +225,10 @@ const Auth: React.FC = () => {
 
             <div className="text-center">
               <Button
-                variant="ghost"
+                variant="link"
                 onClick={() => setIsLogin(!isLogin)}
                 disabled={loading || googleLoading}
-                className="text-sm"
+                className="text-sm text-muted-foreground hover:text-primary"
               >
                 {isLogin 
                   ? "Don't have an account? Sign up" 
@@ -252,6 +238,23 @@ const Auth: React.FC = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* Feature badges */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+          className="flex items-center justify-center gap-4 mt-6 text-xs text-muted-foreground"
+        >
+          <div className="flex items-center gap-1">
+            <Sparkles className="w-3 h-3" />
+            <span>Synced Watching</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Heart className="w-3 h-3" />
+            <span>For Couples</span>
+          </div>
+        </motion.div>
       </motion.div>
     </div>
   );

@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { 
   Video, 
   FileText, 
@@ -13,7 +13,9 @@ import {
   Settings,
   Copy,
   Check,
-  ArrowLeft
+  Home,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
@@ -30,6 +32,17 @@ interface RoomSidebarProps {
   onToggleCollapse?: () => void;
 }
 
+const tabs = [
+  { id: 'video' as TabType, label: 'Watch', icon: Video, description: 'Video player & calls' },
+  { id: 'notes' as TabType, label: 'Notes', icon: FileText, description: 'Shared notes' },
+  { id: 'calendar' as TabType, label: 'Calendar', icon: Calendar, description: 'Plan movie nights' },
+  { id: 'watchlist' as TabType, label: 'Watchlist', icon: Bookmark, description: 'Save for later' },
+  { id: 'ai-movies' as TabType, label: 'AI Picks', icon: Film, description: 'Smart recommendations' },
+  { id: 'love-meter' as TabType, label: 'Love', icon: Heart, description: 'Track your time' },
+  { id: 'themes' as TabType, label: 'Themes', icon: Palette, description: 'Customize look' },
+  { id: 'settings' as TabType, label: 'Settings', icon: Settings, description: 'Room settings' },
+];
+
 export const RoomSidebar: React.FC<RoomSidebarProps> = ({
   activeTab,
   onTabChange,
@@ -40,17 +53,6 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
 }) => {
   const navigate = useNavigate();
   const [copied, setCopied] = React.useState(false);
-
-  const tabs = [
-    { id: 'video' as TabType, label: 'Watch & Call', icon: Video },
-    { id: 'notes' as TabType, label: 'Notes', icon: FileText },
-    { id: 'calendar' as TabType, label: 'Calendar', icon: Calendar },
-    { id: 'watchlist' as TabType, label: 'Watchlist', icon: Bookmark },
-    { id: 'ai-movies' as TabType, label: 'AI Movies', icon: Film },
-    { id: 'love-meter' as TabType, label: 'Love Meter', icon: Heart },
-    { id: 'themes' as TabType, label: 'Themes', icon: Palette },
-    { id: 'settings' as TabType, label: 'Settings', icon: Settings },
-  ];
 
   const handleCopyRoomCode = () => {
     if (roomCode) {
@@ -65,109 +67,148 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
   };
 
   return (
-    <motion.aside
-      initial={{ x: -280 }}
-      animate={{ x: 0, width: isCollapsed ? 80 : 280 }}
-      transition={{ duration: 0.3, ease: 'easeInOut' }}
-      className={cn(
-        "fixed left-0 top-0 h-screen bg-card border-r border-border z-40",
-        "flex flex-col"
-      )}
-    >
-      {/* Header */}
-      <div className="p-6 border-b border-border">
-        {!isCollapsed && (
-          <>
-            <div className="flex items-center justify-between mb-4">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => navigate('/')}
-                className="flex items-center gap-2"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                <span>Home</span>
-              </Button>
-            </div>
-            
-            {roomCode && (
-              <div className="space-y-2">
-                <p className="text-xs text-muted-foreground">Room Code</p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleCopyRoomCode}
-                  className="w-full justify-between"
-                >
-                  <span className="font-mono font-bold">{roomCode}</span>
-                  {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                </Button>
+    <TooltipProvider delayDuration={0}>
+      <motion.aside
+        initial={{ x: -20, opacity: 0 }}
+        animate={{ 
+          x: 0, 
+          opacity: 1,
+          width: isCollapsed ? 72 : 260 
+        }}
+        transition={{ duration: 0.3, ease: 'easeOut' }}
+        className={cn(
+          "fixed left-0 top-0 h-screen z-40",
+          "bg-sidebar border-r border-sidebar-border",
+          "flex flex-col"
+        )}
+      >
+        {/* Header */}
+        <div className={cn(
+          "p-4 border-b border-sidebar-border",
+          isCollapsed ? "flex flex-col items-center" : ""
+        )}>
+          {/* Logo & Home */}
+          <div className={cn(
+            "flex items-center mb-4",
+            isCollapsed ? "justify-center" : "gap-3"
+          )}>
+            <button 
+              onClick={() => navigate('/')}
+              className="w-10 h-10 rounded-xl bg-gradient-romantic flex items-center justify-center hover:opacity-90 transition-opacity"
+            >
+              <Heart className="w-5 h-5 text-white" fill="white" />
+            </button>
+            {!isCollapsed && (
+              <div className="flex-1">
+                <h1 className="font-bold text-gradient">UsTwo</h1>
+                <p className="text-xs text-muted-foreground">Movie Room</p>
               </div>
             )}
-
-            <div className="flex items-center gap-2 mt-4">
-              <div className={cn(
-                "w-2 h-2 rounded-full",
-                isPartnerOnline ? "bg-video-active" : "bg-muted-foreground"
-              )} />
-              <span className="text-xs text-muted-foreground">
-                {isPartnerOnline ? 'Partner Online' : 'Partner Offline'}
-              </span>
-            </div>
-          </>
-        )}
-        
-        {isCollapsed && (
-          <div className="flex flex-col items-center gap-4">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate('/')}
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </Button>
-            <div className={cn(
-              "w-3 h-3 rounded-full",
-              isPartnerOnline ? "bg-video-active animate-pulse" : "bg-muted-foreground"
-            )} />
           </div>
-        )}
-      </div>
+          
+          {/* Room Code */}
+          {roomCode && (
+            <div className={cn("space-y-2", isCollapsed && "hidden")}>
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">Room Code</p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCopyRoomCode}
+                className="w-full justify-between font-mono"
+              >
+                <span className="font-bold tracking-widest">{roomCode}</span>
+                {copied ? <Check className="w-4 h-4 text-success" /> : <Copy className="w-4 h-4" />}
+              </Button>
+            </div>
+          )}
 
-      {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto p-4">
-        <div className="space-y-1">
+          {/* Partner Status */}
+          <div className={cn(
+            "flex items-center gap-2 mt-3",
+            isCollapsed && "justify-center"
+          )}>
+            <span className={cn(
+              "w-2.5 h-2.5 rounded-full",
+              isPartnerOnline ? "bg-success animate-pulse" : "bg-muted-foreground/50"
+            )} />
+            {!isCollapsed && (
+              <span className="text-xs text-muted-foreground">
+                {isPartnerOnline ? 'Partner Online' : 'Waiting for partner'}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Navigation */}
+        <nav className="flex-1 overflow-y-auto p-3 space-y-1">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
             
-            return (
+            const button = (
               <Button
                 key={tab.id}
-                variant={isActive ? 'default' : 'ghost'}
+                variant="ghost"
                 className={cn(
-                  "w-full justify-start",
-                  isCollapsed && "justify-center px-2",
-                  isActive && "bg-primary text-primary-foreground"
+                  "w-full justify-start gap-3 h-11 font-medium transition-all",
+                  isCollapsed && "justify-center px-0",
+                  isActive && "bg-sidebar-accent text-sidebar-accent-foreground",
+                  !isActive && "text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent/50"
                 )}
                 onClick={() => onTabChange(tab.id)}
               >
-                <Icon className={cn("w-4 h-4", !isCollapsed && "mr-3")} />
+                <Icon className={cn(
+                  "w-5 h-5 shrink-0",
+                  isActive && "text-primary"
+                )} />
                 {!isCollapsed && <span>{tab.label}</span>}
+                {isActive && !isCollapsed && (
+                  <motion.div
+                    layoutId="activeTab"
+                    className="absolute left-0 w-1 h-6 bg-primary rounded-r-full"
+                  />
+                )}
               </Button>
             );
-          })}
-        </div>
-      </nav>
 
-      {/* Footer */}
-      {!isCollapsed && (
-        <div className="p-4 border-t border-border">
-          <div className="text-xs text-muted-foreground text-center">
-            UsTwo • Watch Together
-          </div>
+            if (isCollapsed) {
+              return (
+                <Tooltip key={tab.id}>
+                  <TooltipTrigger asChild>
+                    {button}
+                  </TooltipTrigger>
+                  <TooltipContent side="right" className="flex flex-col">
+                    <span className="font-medium">{tab.label}</span>
+                    <span className="text-xs text-muted-foreground">{tab.description}</span>
+                  </TooltipContent>
+                </Tooltip>
+              );
+            }
+
+            return button;
+          })}
+        </nav>
+
+        {/* Footer */}
+        <div className="p-3 border-t border-sidebar-border">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onToggleCollapse}
+            className={cn(
+              "w-full justify-center",
+              !isCollapsed && "justify-between"
+            )}
+          >
+            {!isCollapsed && <span className="text-xs text-muted-foreground">Collapse</span>}
+            {isCollapsed ? (
+              <ChevronRight className="w-4 h-4" />
+            ) : (
+              <ChevronLeft className="w-4 h-4" />
+            )}
+          </Button>
         </div>
-      )}
-    </motion.aside>
+      </motion.aside>
+    </TooltipProvider>
   );
 };
