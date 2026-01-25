@@ -27,8 +27,14 @@ export const useRealtimeSync = ({ roomId, onPlaybackUpdate, onMediaSync, onSyncE
   useEffect(() => {
     if (!roomId) return;
 
+    console.log('[RealtimeSync] Setting up channel for room:', roomId);
+
     // Create realtime channel for the room
-    const channel = supabase.channel(`room_${roomId}`)
+    const channel = supabase.channel(`room_${roomId}`, {
+      config: {
+        broadcast: { self: false } // Don't receive own broadcasts
+      }
+    })
       .on(
         'postgres_changes',
         {
@@ -42,7 +48,10 @@ export const useRealtimeSync = ({ roomId, onPlaybackUpdate, onMediaSync, onSyncE
           // Skip updates that we sent ourselves
           if (newState.last_updated_by === user?.id) return;
 
-          console.log('Playback state updated from partner:', newState);
+          console.log('[RealtimeSync] DB UPDATE from partner:', {
+            time: newState.current_time_seconds,
+            playing: newState.is_playing
+          });
           onPlaybackUpdate(newState);
           onMediaSync(newState.current_time_seconds ?? 0, newState.is_playing ?? false);
         }
@@ -60,22 +69,27 @@ export const useRealtimeSync = ({ roomId, onPlaybackUpdate, onMediaSync, onSyncE
           // Skip updates that we sent ourselves
           if (newState.last_updated_by === user?.id) return;
 
-          console.log('Playback state inserted from partner:', newState);
+          console.log('[RealtimeSync] DB INSERT from partner:', {
+            time: newState.current_time_seconds,
+            playing: newState.is_playing
+          });
           onPlaybackUpdate(newState);
           onMediaSync(newState.current_time_seconds ?? 0, newState.is_playing ?? false);
         }
       )
       .on('broadcast', { event: 'sync_event' }, (payload) => {
         const event = payload.payload as SyncEvent;
-        console.log('Received sync event:', event);
         
-        // Don't process our own events
+        // Don't process our own events (backup check)
         if (event.userId === user?.id) return;
         
+        console.log('[RealtimeSync] Broadcast sync_event:', event.type, 'time:', event.currentTime.toFixed(1));
         onSyncEvent?.(event);
         onMediaSync(event.currentTime, event.isPlaying);
       })
-      .subscribe();
+      .subscribe((status) => {
+        console.log('[RealtimeSync] Channel status:', status);
+      });
 
     channelRef.current = channel;
 
@@ -87,30 +101,30 @@ export const useRealtimeSync = ({ roomId, onPlaybackUpdate, onMediaSync, onSyncE
   }, [roomId, onPlaybackUpdate, onMediaSync, onSyncEvent, user?.id]);
 
   const sendPlaybackUpdate = async (currentTime: number, isPlaying: boolean) => {
+    if (!user?.id) return;
+    
     try {
-      const { error, count } = await supabase
+      console.log('[RealtimeSync] Sending DB update:', { time: currentTime.toFixed(1), playing: isPlaying });
+      
+      // Use upsert for atomic operation
+      const { error } = await supabase
         .from('playback_state')
-        .update({
-          current_time_seconds: currentTime,
-          is_playing: isPlaying,
-          last_updated_by: user?.id ?? null,
-          updated_at: new Date().toISOString()
-        }, { count: 'exact' })
-        .eq('room_id', roomId);
-
-      if (error) throw error;
-
-      // If no row existed, insert one
-      if (!count || count === 0) {
-        await supabase.from('playback_state').insert({
+        .upsert({
           room_id: roomId,
           current_time_seconds: currentTime,
           is_playing: isPlaying,
-          last_updated_by: user?.id ?? null
+          last_updated_by: user.id,
+          updated_at: new Date().toISOString()
+        }, { 
+          onConflict: 'room_id',
+          ignoreDuplicates: false 
         });
+
+      if (error) {
+        console.error('[RealtimeSync] DB upsert error:', error);
       }
     } catch (error) {
-      console.error('Error sending playback update:', error);
+      console.error('[RealtimeSync] Error sending playback update:', error);
     }
   };
 

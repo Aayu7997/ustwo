@@ -740,19 +740,26 @@ export const EnhancedVideoPlayer: React.FC<EnhancedVideoPlayerProps> = ({
                 onPlaybackUpdate={(time, playing) => {
                   setCurrentTime(time);
                   setIsPlaying(playing);
-                  // Always send sync for both play AND pause
+                  
+                  // CRITICAL: Always sync to partner for BOTH play and pause
                   if (enableSync) {
+                    console.log('[EnhancedPlayer] YouTube state:', playing ? 'PLAY' : 'PAUSE', 'at', time.toFixed(1));
+                    // Send via DB for persistence
                     sendPlaybackState(time, playing);
+                    // Send via broadcast for immediate sync
                     broadcastSync(playing ? 'play' : 'pause', time, playing);
                   }
                 }}
                 onDurationChange={(d) => setDuration(d)}
                 onReady={() => {
+                  console.log('[EnhancedPlayer] YouTube player ready');
                   playerReadyRef.current = true;
                   setIsLoading(false);
                   
+                  // Apply any pending sync state
                   if (pendingSyncRef.current) {
                     const { time, isPlaying: playing } = pendingSyncRef.current;
+                    console.log('[EnhancedPlayer] Applying pending sync:', { time, playing });
                     if (ytControlsRef.current) {
                       if (Math.abs(ytControlsRef.current.getCurrentTime() - time) > 0.7) {
                         ytControlsRef.current.seekTo(time);

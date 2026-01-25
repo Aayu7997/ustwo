@@ -153,26 +153,24 @@ export const useMediaSync = ({ roomId, onSyncReceived }: UseMediaSyncProps) => {
     if (!user) return;
 
     try {
-      const { error, count } = await supabase
+      console.log('[MediaSync] Sending playback state:', { time: time.toFixed(1), isPlaying });
+      
+      // Use upsert for atomic operation
+      const { error } = await supabase
         .from('playback_state')
-        .update({
+        .upsert({
+          room_id: roomId,
           current_time_seconds: time,
           is_playing: isPlaying,
           last_updated_by: user.id,
           updated_at: new Date().toISOString()
-        }, { count: 'exact' })
-        .eq('room_id', roomId);
-
-      if (error) throw error;
-
-      // Insert if no row existed
-      if (!count || count === 0) {
-        await supabase.from('playback_state').insert({
-          room_id: roomId,
-          current_time_seconds: time,
-          is_playing: isPlaying,
-          last_updated_by: user.id
+        }, {
+          onConflict: 'room_id',
+          ignoreDuplicates: false
         });
+
+      if (error) {
+        console.error('[MediaSync] Upsert error:', error);
       }
     } catch (error) {
       console.error('[MediaSync] Failed to send playback state:', error);
@@ -184,6 +182,8 @@ export const useMediaSync = ({ roomId, onSyncReceived }: UseMediaSyncProps) => {
     if (!channelRef.current || !user) return;
 
     try {
+      console.log('[MediaSync] Broadcasting:', { type, time: time.toFixed(1), isPlaying });
+      
       await channelRef.current.send({
         type: 'broadcast',
         event: 'media_sync',
