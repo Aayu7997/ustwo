@@ -333,7 +333,20 @@ export const useMediaStreaming = ({ roomId, roomCode, enabled = true }: UseMedia
         if (streamerId === user.id) return;
         
         console.log('[MediaStreaming] Partner stopped streaming');
-        cleanup();
+        
+        // Only cleanup remote stream state, don't affect local player
+        if (peerRef.current) {
+          try { peerRef.current.destroy(); } catch {}
+          peerRef.current = null;
+        }
+        
+        setRemoteStream(null);
+        setState(prev => ({
+          ...prev,
+          isReceiving: false,
+          connectionState: 'idle',
+          streamerId: null
+        }));
         
         toast({
           title: "Stream Ended",
