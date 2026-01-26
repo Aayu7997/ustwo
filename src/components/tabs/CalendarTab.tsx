@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { SharedCalendar } from '@/components/SharedCalendar';
+import { EnhancedSharedCalendar } from '@/components/EnhancedSharedCalendar';
 
 interface CalendarTabProps {
   roomId: string;
@@ -23,7 +23,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ roomId }) => {
         </p>
       </div>
       
-      <SharedCalendar roomId={roomId} />
+      <EnhancedSharedCalendar roomId={roomId} />
     </motion.div>
   );
 };

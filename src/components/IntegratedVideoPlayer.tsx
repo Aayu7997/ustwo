@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
-import { EnhancedVideoPlayer } from './EnhancedVideoPlayer';
-import { EnhancedVideoCallOverlay } from './EnhancedVideoCallOverlay';
+import { PremiumVideoPlayer } from './PremiumVideoPlayer';
+import { PremiumVideoCallOverlay } from './PremiumVideoCallOverlay';
 import { ReactionOverlay } from './ReactionOverlay';
 import { VideoQueue } from './VideoQueue';
 import { TimestampedNotes } from './TimestampedNotes';
 import { Button } from './ui/button';
-import { Video, Phone, Copy, Check } from 'lucide-react';
+import { Badge } from './ui/badge';
+import { Video, Phone, Copy, Check, Users, Heart } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { toast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
 interface IntegratedVideoPlayerProps {
   roomId: string;
@@ -34,12 +36,10 @@ export const IntegratedVideoPlayer: React.FC<IntegratedVideoPlayerProps> = ({
   };
 
   const handlePlayVideo = (url: string, type: string) => {
-    // Store the video URL to highlight in queue
     setCurrentVideoUrl(url);
   };
 
   const handleSeekToTime = (time: number) => {
-    // Note: EnhancedVideoPlayer will handle seeking via its sync system
     toast({ title: 'Seeking...', description: `Jumping to ${Math.floor(time)}s` });
   };
 
@@ -58,34 +58,46 @@ export const IntegratedVideoPlayer: React.FC<IntegratedVideoPlayerProps> = ({
 
   return (
     <div className="relative w-full space-y-6">
-      {/* Copy Room Link Button */}
-      {roomCode && (
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex justify-center"
-        >
+      {/* Room Info Bar */}
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex items-center justify-between flex-wrap gap-3"
+      >
+        <div className="flex items-center gap-3">
+          <Badge variant="secondary" className="gap-2 py-1.5 px-3">
+            <Users className="w-4 h-4" />
+            Room: {roomCode || 'Loading...'}
+          </Badge>
+          <Badge variant="outline" className="gap-2 py-1.5 px-3">
+            <Heart className="w-4 h-4 text-primary" />
+            Synced
+          </Badge>
+        </div>
+        
+        {roomCode && (
           <Button
             onClick={copyRoomLink}
             variant="outline"
+            size="sm"
             className="gap-2"
           >
             {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-            {copied ? 'Link Copied!' : 'Copy Room Link'}
+            {copied ? 'Copied!' : 'Copy Link'}
           </Button>
-        </motion.div>
-      )}
+        )}
+      </motion.div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         {/* Main Video Player */}
-        <div className="lg:col-span-2 space-y-4">
-          <EnhancedVideoPlayer
+        <div className="xl:col-span-2 space-y-4">
+          <PremiumVideoPlayer
             roomId={roomId}
             roomCode={roomCode}
             onPlaybackStateChange={handlePlaybackUpdate}
           />
 
-          {/* Call Toggle Buttons */}
+          {/* Call Buttons */}
           {!isCallActive && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -97,7 +109,10 @@ export const IntegratedVideoPlayer: React.FC<IntegratedVideoPlayerProps> = ({
                   setIsVoiceOnly(false);
                   setIsCallActive(true);
                 }}
-                className="flex items-center gap-2 bg-gradient-to-r from-love-pink to-love-purple hover:from-love-pink/90 hover:to-love-purple/90 text-white shadow-lg"
+                className={cn(
+                  "flex items-center gap-2 shadow-lg",
+                  "bg-gradient-romantic hover:opacity-90 text-white"
+                )}
                 size="lg"
               >
                 <Video className="w-5 h-5" />
@@ -119,7 +134,7 @@ export const IntegratedVideoPlayer: React.FC<IntegratedVideoPlayerProps> = ({
           )}
         </div>
 
-        {/* Sidebar - Queue and Notes */}
+        {/* Sidebar */}
         <div className="space-y-4">
           <VideoQueue
             roomId={roomId}
@@ -141,8 +156,8 @@ export const IntegratedVideoPlayer: React.FC<IntegratedVideoPlayerProps> = ({
         isPlaying={isPlaying}
       />
 
-      {/* Video Call Overlay (PiP) */}
-      <EnhancedVideoCallOverlay
+      {/* Video Call Overlay */}
+      <PremiumVideoCallOverlay
         roomId={roomId}
         roomCode={roomCode}
         isActive={isCallActive}
