@@ -94,6 +94,8 @@ const Room: React.FC = () => {
     );
   }
 
+  const isRoomCreator = currentRoom?.creator_id === user?.id;
+
   const renderTabContent = () => {
     if (!roomId || !currentRoom) return null;
 
@@ -102,6 +104,7 @@ const Room: React.FC = () => {
         <VideoTab
           roomId={roomId}
           roomCode={currentRoom.room_code}
+          isRoomCreator={isRoomCreator}
           onPlaybackStateChange={(state) => {
             setPlaybackState({
               isPlaying: state.is_playing || false,
