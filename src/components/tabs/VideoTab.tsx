@@ -1,14 +1,20 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { IntegratedVideoPlayer } from '@/components/IntegratedVideoPlayer';
+import { ProductionIntegratedPlayer } from '@/components/ProductionIntegratedPlayer';
 
 interface VideoTabProps {
   roomId: string;
   roomCode?: string;
+  isRoomCreator?: boolean;
   onPlaybackStateChange?: (state: any) => void;
 }
 
-export const VideoTab: React.FC<VideoTabProps> = ({ roomId, roomCode, onPlaybackStateChange }) => {
+export const VideoTab: React.FC<VideoTabProps> = ({ 
+  roomId, 
+  roomCode, 
+  isRoomCreator = false,
+  onPlaybackStateChange 
+}) => {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -20,13 +26,17 @@ export const VideoTab: React.FC<VideoTabProps> = ({ roomId, roomCode, onPlayback
       <div className="text-center space-y-2">
         <h2 className="text-2xl font-bold">Watch Together</h2>
         <p className="text-muted-foreground">
-          Playback is automatically synchronized. Upload files, paste YouTube/Vimeo links, or use WebTorrent. Video call available below.
+          {isRoomCreator 
+            ? "You're the host! Control playback for both of you. Upload files, paste YouTube/Vimeo links, or stream P2P."
+            : "You're synced with your partner. Playback is controlled by the host."
+          }
         </p>
       </div>
       
-      <IntegratedVideoPlayer 
+      <ProductionIntegratedPlayer 
         roomId={roomId}
         roomCode={roomCode}
+        isRoomCreator={isRoomCreator}
         onPlaybackStateChange={onPlaybackStateChange}
       />
     </motion.div>
