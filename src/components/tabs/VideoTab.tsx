@@ -6,6 +6,8 @@ interface VideoTabProps {
   roomId: string;
   roomCode?: string;
   isRoomCreator?: boolean;
+  partnerId?: string | null;
+  partnerName?: string;
   onPlaybackStateChange?: (state: any) => void;
 }
 
@@ -13,6 +15,8 @@ export const VideoTab: React.FC<VideoTabProps> = ({
   roomId, 
   roomCode, 
   isRoomCreator = false,
+  partnerId,
+  partnerName,
   onPlaybackStateChange 
 }) => {
   return (
@@ -37,6 +41,8 @@ export const VideoTab: React.FC<VideoTabProps> = ({
         roomId={roomId}
         roomCode={roomCode}
         isRoomCreator={isRoomCreator}
+        partnerId={partnerId}
+        partnerName={partnerName}
         onPlaybackStateChange={onPlaybackStateChange}
       />
     </motion.div>

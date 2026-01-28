@@ -105,6 +105,8 @@ const Room: React.FC = () => {
           roomId={roomId}
           roomCode={currentRoom.room_code}
           isRoomCreator={isRoomCreator}
+          partnerId={isRoomCreator ? currentRoom.partner_id : currentRoom.creator_id}
+          partnerName="Partner"
           onPlaybackStateChange={(state) => {
             setPlaybackState({
               isPlaying: state.is_playing || false,
@@ -114,7 +116,7 @@ const Room: React.FC = () => {
         />
       ),
       notes: <NotesTab />,
-      calendar: <CalendarTab roomId={roomId} partnerId={currentRoom.partner_id} />,
+      calendar: <CalendarTab roomId={roomId} partnerId={isRoomCreator ? currentRoom.partner_id : currentRoom.creator_id} />,
       watchlist: <WatchlistTab roomId={roomId} />,
       'ai-movies': (
         <AIMoviesTab

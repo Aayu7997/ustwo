@@ -1,20 +1,21 @@
 import React, { useState } from 'react';
 import { ProductionVideoPlayer } from './ProductionVideoPlayer';
-import { ProductionVideoCallOverlay } from './ProductionVideoCallOverlay';
+import { StableVideoCallOverlay } from './StableVideoCallOverlay';
 import { ReactionOverlay } from './ReactionOverlay';
 import { VideoQueue } from './VideoQueue';
 import { TimestampedNotes } from './TimestampedNotes';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
-import { Video, Phone, Copy, Check, Users, Heart, RefreshCw } from 'lucide-react';
+import { Copy, Check, Users, Heart } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { toast } from '@/hooks/use-toast';
-import { cn } from '@/lib/utils';
 
 interface ProductionIntegratedPlayerProps {
   roomId: string;
   roomCode?: string;
   isRoomCreator: boolean;
+  partnerId?: string | null;
+  partnerName?: string;
   onPlaybackStateChange?: (state: any) => void;
 }
 
@@ -22,10 +23,10 @@ export const ProductionIntegratedPlayer: React.FC<ProductionIntegratedPlayerProp
   roomId,
   roomCode,
   isRoomCreator,
+  partnerId,
+  partnerName = 'Partner',
   onPlaybackStateChange
 }) => {
-  const [isCallActive, setIsCallActive] = useState(false);
-  const [isVoiceOnly, setIsVoiceOnly] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentVideoUrl, setCurrentVideoUrl] = useState('');
@@ -99,42 +100,6 @@ export const ProductionIntegratedPlayer: React.FC<ProductionIntegratedPlayerProp
             isRoomCreator={isRoomCreator}
             onPlaybackStateChange={handlePlaybackUpdate}
           />
-
-          {/* Call Buttons */}
-          {!isCallActive && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="flex justify-center gap-3"
-            >
-              <Button
-                onClick={() => {
-                  setIsVoiceOnly(false);
-                  setIsCallActive(true);
-                }}
-                className={cn(
-                  "flex items-center gap-2 shadow-lg",
-                  "bg-gradient-romantic hover:opacity-90 text-white"
-                )}
-                size="lg"
-              >
-                <Video className="w-5 h-5" />
-                Start Video Call
-              </Button>
-              <Button
-                onClick={() => {
-                  setIsVoiceOnly(true);
-                  setIsCallActive(true);
-                }}
-                variant="outline"
-                className="flex items-center gap-2"
-                size="lg"
-              >
-                <Phone className="w-5 h-5" />
-                Voice Only
-              </Button>
-            </motion.div>
-          )}
         </div>
 
         {/* Sidebar */}
@@ -159,13 +124,11 @@ export const ProductionIntegratedPlayer: React.FC<ProductionIntegratedPlayerProp
         isPlaying={isPlaying}
       />
 
-      {/* Video Call Overlay */}
-      <ProductionVideoCallOverlay
+      {/* Video Call Overlay - Self-managed call initiation */}
+      <StableVideoCallOverlay
         roomId={roomId}
-        roomCode={roomCode}
-        isActive={isCallActive}
-        voiceOnly={isVoiceOnly}
-        onClose={() => setIsCallActive(false)}
+        partnerId={partnerId}
+        partnerName={partnerName}
       />
     </div>
   );
