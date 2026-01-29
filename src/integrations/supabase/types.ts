@@ -96,6 +96,162 @@ export type Database = {
           },
         ]
       }
+      calls: {
+        Row: {
+          answer: Json | null
+          call_type: string
+          caller_id: string
+          created_at: string
+          duration_seconds: number | null
+          ended_at: string | null
+          ice_candidates: Json | null
+          id: string
+          offer: Json | null
+          receiver_id: string
+          room_id: string
+          started_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          answer?: Json | null
+          call_type?: string
+          caller_id: string
+          created_at?: string
+          duration_seconds?: number | null
+          ended_at?: string | null
+          ice_candidates?: Json | null
+          id?: string
+          offer?: Json | null
+          receiver_id: string
+          room_id: string
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          answer?: Json | null
+          call_type?: string
+          caller_id?: string
+          created_at?: string
+          duration_seconds?: number | null
+          ended_at?: string | null
+          ice_candidates?: Json | null
+          id?: string
+          offer?: Json | null
+          receiver_id?: string
+          room_id?: string
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calls_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      game_history: {
+        Row: {
+          game_type: string
+          id: string
+          played_at: string
+          player1_score: number | null
+          player2_score: number | null
+          room_id: string
+          winner_id: string | null
+        }
+        Insert: {
+          game_type: string
+          id?: string
+          played_at?: string
+          player1_score?: number | null
+          player2_score?: number | null
+          room_id: string
+          winner_id?: string | null
+        }
+        Update: {
+          game_type?: string
+          id?: string
+          played_at?: string
+          player1_score?: number | null
+          player2_score?: number | null
+          room_id?: string
+          winner_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "game_history_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      games: {
+        Row: {
+          created_at: string
+          current_question: Json | null
+          game_type: string
+          id: string
+          player1_answer: Json | null
+          player1_id: string
+          player2_answer: Json | null
+          player2_id: string | null
+          room_id: string
+          round: number | null
+          score_player1: number | null
+          score_player2: number | null
+          status: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          current_question?: Json | null
+          game_type: string
+          id?: string
+          player1_answer?: Json | null
+          player1_id: string
+          player2_answer?: Json | null
+          player2_id?: string | null
+          room_id: string
+          round?: number | null
+          score_player1?: number | null
+          score_player2?: number | null
+          status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          current_question?: Json | null
+          game_type?: string
+          id?: string
+          player1_answer?: Json | null
+          player1_id?: string
+          player2_answer?: Json | null
+          player2_id?: string | null
+          room_id?: string
+          round?: number | null
+          score_player1?: number | null
+          score_player2?: number | null
+          status?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "games_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       google_drive_tokens: {
         Row: {
           access_token: string
