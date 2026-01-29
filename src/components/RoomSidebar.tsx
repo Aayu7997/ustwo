@@ -21,7 +21,7 @@ import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
 
-type TabType = 'video' | 'notes' | 'calendar' | 'watchlist' | 'ai-movies' | 'love-meter' | 'themes' | 'settings';
+type TabType = 'video' | 'games' | 'notes' | 'calendar' | 'watchlist' | 'ai-movies' | 'love-meter' | 'themes' | 'settings';
 
 interface RoomSidebarProps {
   activeTab: TabType;
@@ -34,6 +34,7 @@ interface RoomSidebarProps {
 
 const tabs = [
   { id: 'video' as TabType, label: 'Watch', icon: Video, description: 'Video player & calls' },
+  { id: 'games' as TabType, label: 'Games', icon: Heart, description: 'Couple games' },
   { id: 'notes' as TabType, label: 'Notes', icon: FileText, description: 'Shared notes' },
   { id: 'calendar' as TabType, label: 'Calendar', icon: Calendar, description: 'Plan movie nights' },
   { id: 'watchlist' as TabType, label: 'Watchlist', icon: Bookmark, description: 'Save for later' },

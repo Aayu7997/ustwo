@@ -12,15 +12,17 @@ import { AIMoviesTab } from '@/components/tabs/AIMoviesTab';
 import { LoveMeterTab } from '@/components/tabs/LoveMeterTab';
 import { ThemesTab } from '@/components/tabs/ThemesTab';
 import { SettingsTab } from '@/components/tabs/SettingsTab';
+import { GamesTab } from '@/components/tabs/GamesTab';
 import { FloatingHearts } from '@/components/FloatingHearts';
 import { ChatWidget } from '@/components/ChatWidget';
 import { WatchPartyEffects } from '@/components/WatchPartyEffects';
 import { PartnerPresence } from '@/components/PartnerPresence';
+import { RobustVideoCallOverlay } from '@/components/RobustVideoCallOverlay';
 import { Button } from '@/components/ui/button';
 import { Heart, ArrowLeft, Loader2 } from 'lucide-react';
 import { useRoomPresence } from '@/hooks/useRoomPresence';
 
-type TabType = 'video' | 'notes' | 'calendar' | 'watchlist' | 'ai-movies' | 'love-meter' | 'themes' | 'settings';
+type TabType = 'video' | 'games' | 'notes' | 'calendar' | 'watchlist' | 'ai-movies' | 'love-meter' | 'themes' | 'settings';
 
 const Room: React.FC = () => {
   const { roomId } = useParams<{ roomId: string }>();
@@ -95,6 +97,7 @@ const Room: React.FC = () => {
   }
 
   const isRoomCreator = currentRoom?.creator_id === user?.id;
+  const partnerId = isRoomCreator ? currentRoom?.partner_id : currentRoom?.creator_id;
 
   const renderTabContent = () => {
     if (!roomId || !currentRoom) return null;
@@ -105,7 +108,7 @@ const Room: React.FC = () => {
           roomId={roomId}
           roomCode={currentRoom.room_code}
           isRoomCreator={isRoomCreator}
-          partnerId={isRoomCreator ? currentRoom.partner_id : currentRoom.creator_id}
+          partnerId={partnerId}
           partnerName="Partner"
           onPlaybackStateChange={(state) => {
             setPlaybackState({
@@ -115,8 +118,9 @@ const Room: React.FC = () => {
           }}
         />
       ),
+      games: <GamesTab roomId={roomId} partnerId={partnerId} />,
       notes: <NotesTab />,
-      calendar: <CalendarTab roomId={roomId} partnerId={isRoomCreator ? currentRoom.partner_id : currentRoom.creator_id} />,
+      calendar: <CalendarTab roomId={roomId} partnerId={partnerId} />,
       watchlist: <WatchlistTab roomId={roomId} />,
       'ai-movies': (
         <AIMoviesTab
@@ -198,6 +202,15 @@ const Room: React.FC = () => {
           currentTime={playbackState.currentTime}
           partnerJoined={!!currentRoom?.partner_id}
           onSyncEvent={(event) => console.log('Sync event:', event)}
+        />
+      )}
+      
+      {/* Video Call Overlay */}
+      {roomId && partnerId && (
+        <RobustVideoCallOverlay
+          roomId={roomId}
+          partnerId={partnerId}
+          partnerName="Partner"
         />
       )}
       
