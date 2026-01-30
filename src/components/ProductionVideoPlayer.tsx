@@ -17,7 +17,7 @@ import Hls from 'hls.js';
 import { RobustYouTubePlayer } from '@/components/RobustYouTubePlayer';
 import { VimeoPlayer } from '@/components/VimeoPlayer';
 import { useHostSync, SyncState } from '@/hooks/useHostSync';
-import { useMediaStreaming } from '@/hooks/useMediaStreaming';
+import { useEnhancedStreaming } from '@/hooks/useEnhancedStreaming';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
@@ -133,14 +133,14 @@ export const ProductionVideoPlayer: React.FC<ProductionVideoPlayerProps> = ({
     }
   });
 
-  // P2P Live Streaming
+  // P2P Live Streaming - using enhanced version with proper toggle
   const {
     isStreaming,
     isReceiving,
     remoteStream,
-    startStreaming,
+    toggleStreaming,
     stopStreaming
-  } = useMediaStreaming({ roomId, roomCode, enabled: true });
+  } = useEnhancedStreaming({ roomId, roomCode, enabled: true });
 
   // Get current state for sync
   const getCurrentState = useCallback((): Omit<SyncState, 'hostId' | 'updatedAt'> => {
@@ -308,18 +308,20 @@ export const ProductionVideoPlayer: React.FC<ProductionVideoPlayerProps> = ({
     });
   };
 
-  // Start P2P streaming (for local files)
-  const handleStartStreaming = async () => {
+  // Toggle P2P streaming (for local files)
+  const handleToggleStreaming = async () => {
     if (!videoRef.current || !currentFile) {
       toast({ title: "No video loaded", description: "Load a local video first", variant: "destructive" });
       return;
     }
     
-    const success = await startStreaming(videoRef.current);
-    if (success) {
+    const nowStreaming = await toggleStreaming(videoRef.current);
+    if (nowStreaming) {
       setCurrentMediaType('stream');
       await syncMediaSource('stream', 'stream');
       toast({ title: "Streaming Started! 📡", description: "Your partner can now see your video" });
+    } else {
+      toast({ title: "Streaming Stopped", description: "No longer sharing video" });
     }
   };
 
@@ -607,25 +609,24 @@ export const ProductionVideoPlayer: React.FC<ProductionVideoPlayerProps> = ({
 
             <TabsContent value="stream" className="space-y-4">
               <div className="flex gap-2">
-                {!isStreaming ? (
-                  <Button 
-                    onClick={handleStartStreaming}
-                    disabled={!currentFile || !videoRef.current}
-                    className="flex-1 bg-gradient-romantic"
-                  >
-                    <Radio className="w-4 h-4 mr-2" />
-                    Stream to Partner
-                  </Button>
-                ) : (
-                  <Button 
-                    onClick={stopStreaming}
-                    variant="destructive"
-                    className="flex-1"
-                  >
-                    <WifiOff className="w-4 h-4 mr-2" />
-                    Stop Streaming
-                  </Button>
-                )}
+                <Button 
+                  onClick={handleToggleStreaming}
+                  disabled={!currentFile || !videoRef.current}
+                  variant={isStreaming ? "destructive" : "default"}
+                  className={cn("flex-1", !isStreaming && "bg-gradient-to-r from-primary to-pink-500")}
+                >
+                  {isStreaming ? (
+                    <>
+                      <WifiOff className="w-4 h-4 mr-2" />
+                      Stop Streaming
+                    </>
+                  ) : (
+                    <>
+                      <Radio className="w-4 h-4 mr-2" />
+                      Stream to Partner
+                    </>
+                  )}
+                </Button>
               </div>
               <p className="text-xs text-muted-foreground">
                 P2P streaming shares your local video directly with your partner - no upload needed!

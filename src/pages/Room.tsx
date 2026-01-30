@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRoom, Room as RoomType } from '@/hooks/useRoom';
 import { useAuth } from '@/hooks/useAuth';
+import { useVisibilityHandler } from '@/hooks/useVisibilityHandler';
 import { RoomSidebar } from '@/components/RoomSidebar';
 import { VideoTab } from '@/components/tabs/VideoTab';
 import { NotesTab } from '@/components/tabs/NotesTab';
@@ -17,7 +18,7 @@ import { FloatingHearts } from '@/components/FloatingHearts';
 import { ChatWidget } from '@/components/ChatWidget';
 import { WatchPartyEffects } from '@/components/WatchPartyEffects';
 import { PartnerPresence } from '@/components/PartnerPresence';
-import { RobustVideoCallOverlay } from '@/components/RobustVideoCallOverlay';
+import { ProductionCallOverlay } from '@/components/ProductionCallOverlay';
 import { Button } from '@/components/ui/button';
 import { Heart, ArrowLeft, Loader2 } from 'lucide-react';
 import { useRoomPresence } from '@/hooks/useRoomPresence';
@@ -36,6 +37,9 @@ const Room: React.FC = () => {
   const [playbackState, setPlaybackState] = useState({ isPlaying: false, currentTime: 0 });
   const [chatMinimized, setChatMinimized] = useState(true);
   const { partnerJoined } = useRoomPresence(roomId || '');
+  
+  // Visibility handler - keeps connections stable when switching tabs
+  useVisibilityHandler(roomId || '');
 
   useEffect(() => {
     if (roomId && !authLoading && user) {
@@ -207,7 +211,7 @@ const Room: React.FC = () => {
       
       {/* Video Call Overlay */}
       {roomId && partnerId && (
-        <RobustVideoCallOverlay
+        <ProductionCallOverlay
           roomId={roomId}
           partnerId={partnerId}
           partnerName="Partner"
