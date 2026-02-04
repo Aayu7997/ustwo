@@ -6,6 +6,7 @@ import { useRoom, Room } from '@/hooks/useRoom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { UsTwoLogo } from '@/components/UsTwoLogo';
 import { 
   Heart, 
   LogOut, 
@@ -72,9 +73,7 @@ const Index = () => {
           animate={{ opacity: 1, scale: 1 }}
           className="text-center space-y-4"
         >
-          <div className="w-16 h-16 mx-auto">
-            <Heart className="w-full h-full text-primary animate-heart-beat" fill="currentColor" />
-          </div>
+          <UsTwoLogo size="lg" className="mx-auto" />
           <p className="text-muted-foreground">Loading your space...</p>
         </motion.div>
       </div>
@@ -99,12 +98,7 @@ const Index = () => {
         className="sticky top-0 z-50 glass border-b"
       >
         <div className="container mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-romantic flex items-center justify-center">
-              <Heart className="w-5 h-5 text-white" fill="white" />
-            </div>
-            <span className="text-xl font-bold text-gradient">UsTwo</span>
-          </div>
+          <UsTwoLogo size="md" showText />
           
           <div className="flex items-center gap-4">
             <span className="text-sm text-muted-foreground hidden sm:block">
@@ -335,10 +329,7 @@ const Index = () => {
       <footer className="border-t bg-card/50 mt-20">
         <div className="container mx-auto px-6 py-8">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
-              <Heart className="w-5 h-5 text-primary" fill="currentColor" />
-              <span className="font-semibold">UsTwo</span>
-            </div>
+            <UsTwoLogo size="sm" showText />
             <p className="text-sm text-muted-foreground">
               Watch together, feel together. Made with ❤️ for couples.
             </p>

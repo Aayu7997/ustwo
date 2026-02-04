@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { UsTwoLogo } from '@/components/UsTwoLogo';
 import { Heart, Mail, Lock, Eye, EyeOff, Sparkles } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useGoogleAuth } from '@/hooks/useGoogleAuth';
@@ -130,9 +131,7 @@ const Auth: React.FC = () => {
               transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
               className="flex justify-center"
             >
-              <div className="w-16 h-16 rounded-2xl bg-gradient-romantic flex items-center justify-center shadow-glow">
-                <Heart className="w-8 h-8 text-white" fill="currentColor" />
-              </div>
+              <UsTwoLogo size="lg" />
             </motion.div>
             <div className="space-y-2">
               <CardTitle className="text-2xl font-bold">

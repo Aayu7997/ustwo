@@ -2,6 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { UsTwoLogo } from '@/components/UsTwoLogo';
 import { 
   Video, 
   FileText, 
@@ -15,7 +16,8 @@ import {
   Check,
   Home,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Gamepad2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
@@ -34,7 +36,7 @@ interface RoomSidebarProps {
 
 const tabs = [
   { id: 'video' as TabType, label: 'Watch', icon: Video, description: 'Video player & calls' },
-  { id: 'games' as TabType, label: 'Games', icon: Heart, description: 'Couple games' },
+  { id: 'games' as TabType, label: 'Games', icon: Gamepad2, description: 'Couple games' },
   { id: 'notes' as TabType, label: 'Notes', icon: FileText, description: 'Shared notes' },
   { id: 'calendar' as TabType, label: 'Calendar', icon: Calendar, description: 'Plan movie nights' },
   { id: 'watchlist' as TabType, label: 'Watchlist', icon: Bookmark, description: 'Save for later' },
@@ -95,16 +97,10 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
           )}>
             <button 
               onClick={() => navigate('/')}
-              className="w-10 h-10 rounded-xl bg-gradient-romantic flex items-center justify-center hover:opacity-90 transition-opacity"
+              className="hover:opacity-90 transition-opacity"
             >
-              <Heart className="w-5 h-5 text-white" fill="white" />
+              <UsTwoLogo size={isCollapsed ? "sm" : "md"} showText={!isCollapsed} />
             </button>
-            {!isCollapsed && (
-              <div className="flex-1">
-                <h1 className="font-bold text-gradient">UsTwo</h1>
-                <p className="text-xs text-muted-foreground">Movie Room</p>
-              </div>
-            )}
           </div>
           
           {/* Room Code */}
