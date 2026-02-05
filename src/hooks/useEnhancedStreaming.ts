@@ -3,34 +3,7 @@ import SimplePeer from 'simple-peer';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { toast } from '@/hooks/use-toast';
-
-// Production ICE config with OpenRelay TURN
-const ICE_CONFIG = {
-  iceServers: [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-    {
-      urls: 'turn:openrelay.metered.ca:80',
-      username: 'openrelayproject',
-      credential: 'openrelayproject'
-    },
-    {
-      urls: 'turn:openrelay.metered.ca:443',
-      username: 'openrelayproject',
-      credential: 'openrelayproject'
-    },
-    {
-      urls: 'turns:openrelay.metered.ca:443',
-      username: 'openrelayproject',
-      credential: 'openrelayproject'
-    },
-    {
-      urls: 'turn:a.relay.metered.ca:80',
-      username: 'c99f0b4ad86e66f8b0ad0e23',
-      credential: 'zM1ZQmfR7RxGkjBd'
-    }
-  ]
-};
+import { getIceConfigSync } from '@/lib/webrtc/iceConfig';
 
 interface StreamingState {
   isStreaming: boolean;
@@ -118,7 +91,7 @@ export const useEnhancedStreaming = ({ roomId, roomCode, enabled = true }: UseEn
       initiator,
       trickle: false, // Non-trickle for simpler signaling
       stream: stream || undefined,
-      config: ICE_CONFIG
+      config: getIceConfigSync()
     });
 
     peer.on('signal', async (signal) => {

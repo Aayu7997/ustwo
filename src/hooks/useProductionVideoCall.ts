@@ -3,36 +3,7 @@ import SimplePeer from 'simple-peer';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { toast } from '@/hooks/use-toast';
-
-// Production ICE configuration with reliable TURN servers
-const ICE_SERVERS = [
-  // STUN servers for NAT traversal
-  { urls: 'stun:stun.l.google.com:19302' },
-  { urls: 'stun:stun1.l.google.com:19302' },
-  { urls: 'stun:stun.relay.metered.ca:80' },
-  
-  // TURN servers for firewall/symmetric NAT traversal
-  {
-    urls: 'turn:a.relay.metered.ca:80',
-    username: 'c99f0b4ad86e66f8b0ad0e23',
-    credential: 'zM1ZQmfR7RxGkjBd'
-  },
-  {
-    urls: 'turn:a.relay.metered.ca:80?transport=tcp',
-    username: 'c99f0b4ad86e66f8b0ad0e23',
-    credential: 'zM1ZQmfR7RxGkjBd'
-  },
-  {
-    urls: 'turn:a.relay.metered.ca:443',
-    username: 'c99f0b4ad86e66f8b0ad0e23',
-    credential: 'zM1ZQmfR7RxGkjBd'
-  },
-  {
-    urls: 'turn:a.relay.metered.ca:443?transport=tcp',
-    username: 'c99f0b4ad86e66f8b0ad0e23',
-    credential: 'zM1ZQmfR7RxGkjBd'
-  }
-];
+import { getIceConfigSync } from '@/lib/webrtc/iceConfig';
 
 export type CallState = 'idle' | 'requesting' | 'connecting' | 'connected' | 'failed' | 'ended';
 
@@ -152,7 +123,7 @@ export const useProductionVideoCall = ({ roomId, roomCode, voiceOnly = false }: 
       initiator,
       trickle: true, // Use trickle ICE for faster connection
       stream,
-      config: { iceServers: ICE_SERVERS }
+      config: getIceConfigSync()
     });
 
     peer.on('signal', async (signal) => {

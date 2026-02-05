@@ -3,6 +3,7 @@ import SimplePeer from 'simple-peer';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { toast } from '@/hooks/use-toast';
+import { getIceConfigSync } from '@/lib/webrtc/iceConfig';
 
 interface UseMediaStreamingProps {
   roomId: string;
@@ -16,23 +17,6 @@ interface StreamingState {
   connectionState: 'idle' | 'connecting' | 'connected' | 'failed';
   streamerId: string | null;
 }
-
-const ICE_SERVERS = [
-  { urls: 'stun:stun.l.google.com:19302' },
-  { urls: 'stun:stun1.l.google.com:19302' },
-  { urls: 'stun:stun2.l.google.com:19302' },
-  { urls: 'stun:stun.relay.metered.ca:80' },
-  {
-    urls: 'turn:a.relay.metered.ca:80',
-    username: 'c99f0b4ad86e66f8b0ad0e23',
-    credential: 'zM1ZQmfR7RxGkjBd'
-  },
-  {
-    urls: 'turn:a.relay.metered.ca:443',
-    username: 'c99f0b4ad86e66f8b0ad0e23',
-    credential: 'zM1ZQmfR7RxGkjBd'
-  }
-];
 
 export const useMediaStreaming = ({ roomId, roomCode, enabled = true }: UseMediaStreamingProps) => {
   const { user } = useAuth();
@@ -84,8 +68,9 @@ export const useMediaStreaming = ({ roomId, roomCode, enabled = true }: UseMedia
       // and keep DB signaling simple & reliable.
       trickle: false,
       stream: stream || undefined,
-      config: { iceServers: ICE_SERVERS }
+      config: getIceConfigSync()
     });
+
 
     peer.on('signal', async (signal) => {
       console.log('[MediaStreaming] Signal generated:', (signal as any)?.type ?? 'signal');

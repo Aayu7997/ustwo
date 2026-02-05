@@ -613,7 +613,7 @@ export const ProductionVideoPlayer: React.FC<ProductionVideoPlayerProps> = ({
                   onClick={handleToggleStreaming}
                   disabled={!currentFile || !videoRef.current}
                   variant={isStreaming ? "destructive" : "default"}
-                  className={cn("flex-1", !isStreaming && "bg-gradient-to-r from-primary to-pink-500")}
+                  className={cn("flex-1", !isStreaming && "bg-gradient-romantic")}
                 >
                   {isStreaming ? (
                     <>
@@ -674,8 +674,18 @@ export const ProductionVideoPlayer: React.FC<ProductionVideoPlayerProps> = ({
           </div>
         )}
 
+        {/* Waiting for stream handshake (prevents blank player) */}
+        {isReceiving && !remoteStream && currentMediaType === 'stream' && !isStreaming && (
+          <div className="w-full aspect-video flex items-center justify-center">
+            <div className="text-center text-white/80 space-y-2">
+              <Loader2 className="w-8 h-8 animate-spin mx-auto" />
+              <p className="text-sm">Connecting to partner's stream…</p>
+            </div>
+          </div>
+        )}
+
         {/* YouTube Player */}
-        {!isReceiving && currentMediaType === 'youtube' && youtubeVideoId && (
+        {!(isReceiving && remoteStream) && currentMediaType === 'youtube' && youtubeVideoId && (
           <RobustYouTubePlayer 
             videoId={youtubeVideoId}
             onPlaybackUpdate={(time, playing) => {
@@ -707,7 +717,7 @@ export const ProductionVideoPlayer: React.FC<ProductionVideoPlayerProps> = ({
         )}
 
         {/* Vimeo Player */}
-        {!isReceiving && currentMediaType === 'vimeo' && (
+        {!(isReceiving && remoteStream) && currentMediaType === 'vimeo' && (
           <VimeoPlayer 
             videoId={videoSrc}
             onPlaybackUpdate={(time, playing) => {
@@ -734,33 +744,36 @@ export const ProductionVideoPlayer: React.FC<ProductionVideoPlayerProps> = ({
         )}
 
         {/* Native Video Player */}
-        {!isReceiving && currentMediaType !== 'youtube' && currentMediaType !== 'vimeo' && (
-          <div className="relative w-full aspect-video">
-            <video
-              ref={videoRef}
-              src={videoSrc}
-              className="w-full h-full object-contain"
-              controls={false}
-              playsInline
-              crossOrigin="anonymous"
-              preload="metadata"
-            />
-            
-            {/* Autoplay blocked overlay */}
-            {autoplayBlocked && (
-              <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-20">
-                <Button 
-                  onClick={() => { setAutoplayBlocked(false); videoRef.current?.play(); }}
-                  size="lg" 
-                  className="gap-2 bg-gradient-romantic"
-                >
-                  <Play className="w-5 h-5" />
-                  Click to Sync Playback
-                </Button>
-              </div>
-            )}
-          </div>
-        )}
+        {!(isReceiving && remoteStream) &&
+          currentMediaType !== 'youtube' &&
+          currentMediaType !== 'vimeo' &&
+          !(currentMediaType === 'stream' && !isStreaming) && (
+            <div className="relative w-full aspect-video">
+              <video
+                ref={videoRef}
+                src={videoSrc}
+                className="w-full h-full object-contain"
+                controls={false}
+                playsInline
+                crossOrigin="anonymous"
+                preload="metadata"
+              />
+              
+              {/* Autoplay blocked overlay */}
+              {autoplayBlocked && (
+                <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-20">
+                  <Button 
+                    onClick={() => { setAutoplayBlocked(false); videoRef.current?.play(); }}
+                    size="lg" 
+                    className="gap-2 bg-gradient-romantic"
+                  >
+                    <Play className="w-5 h-5" />
+                    Click to Sync Playback
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
 
         {/* Loading Overlay */}
         {isLoading && (
@@ -772,127 +785,6 @@ export const ProductionVideoPlayer: React.FC<ProductionVideoPlayerProps> = ({
           </div>
         )}
 
-        {/* Controls Overlay */}
-        <AnimatePresence>
-          {(showControls || !isPlaying) && currentMediaType !== 'youtube' && currentMediaType !== 'vimeo' && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-black/30"
-            >
-              {/* Top Bar */}
-              <div className="absolute top-0 left-0 right-0 p-4 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary" className="bg-primary/20 text-primary">
-                    <Users className="w-3 h-3 mr-1" />
-                    {isHost ? 'Controlling' : 'Synced'}
-                  </Badge>
-                </div>
-                {isStreaming && (
-                  <Badge className="bg-red-500 animate-pulse">
-                    <Radio className="w-3 h-3 mr-1" />
-                    LIVE
-                  </Badge>
-                )}
-              </div>
-
-              {/* Center Play Button */}
-              <div className="absolute inset-0 flex items-center justify-center">
-                <motion.button
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={togglePlayPause}
-                  className="w-20 h-20 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center hover:bg-white/30 transition-colors"
-                >
-                  {isPlaying ? (
-                    <Pause className="w-10 h-10 text-white" />
-                  ) : (
-                    <Play className="w-10 h-10 text-white ml-1" />
-                  )}
-                </motion.button>
-              </div>
-
-              {/* Bottom Controls */}
-              <div className="absolute bottom-0 left-0 right-0 p-4 space-y-3">
-                <div className="group/progress">
-                  <Slider
-                    value={[progressPercent]}
-                    onValueChange={handleSeek}
-                    max={100}
-                    step={0.1}
-                    className="w-full cursor-pointer"
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => skipTime(-10)}
-                      className="text-white hover:bg-white/20 h-10 w-10"
-                    >
-                      <SkipBack className="w-5 h-5" />
-                    </Button>
-                    
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={togglePlayPause}
-                      className="text-white hover:bg-white/20 h-12 w-12"
-                    >
-                      {isPlaying ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6" />}
-                    </Button>
-                    
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => skipTime(10)}
-                      className="text-white hover:bg-white/20 h-10 w-10"
-                    >
-                      <SkipForward className="w-5 h-5" />
-                    </Button>
-
-                    <div className="flex items-center gap-2 ml-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={toggleMute}
-                        className="text-white hover:bg-white/20 h-10 w-10"
-                      >
-                        {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
-                      </Button>
-                      <div className="w-24 hidden md:block">
-                        <Slider
-                          value={[isMuted ? 0 : volume]}
-                          onValueChange={handleVolumeChange}
-                          max={100}
-                          step={1}
-                        />
-                      </div>
-                    </div>
-
-                    <span className="text-white text-sm ml-4">
-                      {formatTime(currentTime)} / {formatTime(duration)}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={toggleFullscreen}
-                      className="text-white hover:bg-white/20 h-10 w-10"
-                    >
-                      {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
     </motion.div>
   );
