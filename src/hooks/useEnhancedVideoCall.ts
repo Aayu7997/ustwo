@@ -3,44 +3,7 @@ import SimplePeer from 'simple-peer';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { toast } from '@/hooks/use-toast';
-
-// OpenRelay TURN servers - free and reliable
-const ICE_CONFIG = {
-  iceServers: [
-    // STUN servers
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun.relay.metered.ca:80' },
-    // OpenRelay TURN servers - production grade
-    {
-      urls: 'turn:openrelay.metered.ca:80',
-      username: 'openrelayproject',
-      credential: 'openrelayproject'
-    },
-    {
-      urls: 'turn:openrelay.metered.ca:443',
-      username: 'openrelayproject',
-      credential: 'openrelayproject'
-    },
-    {
-      urls: 'turns:openrelay.metered.ca:443',
-      username: 'openrelayproject',
-      credential: 'openrelayproject'
-    },
-    // Metered backup TURN
-    {
-      urls: 'turn:a.relay.metered.ca:80',
-      username: 'c99f0b4ad86e66f8b0ad0e23',
-      credential: 'zM1ZQmfR7RxGkjBd'
-    },
-    {
-      urls: 'turn:a.relay.metered.ca:443?transport=tcp',
-      username: 'c99f0b4ad86e66f8b0ad0e23',
-      credential: 'zM1ZQmfR7RxGkjBd'
-    }
-  ],
-  iceCandidatePoolSize: 10
-};
+import { getIceConfigSync } from '@/lib/webrtc/iceConfig';
 
 export type CallState = 'idle' | 'requesting' | 'connecting' | 'connected' | 'reconnecting' | 'failed';
 
@@ -189,7 +152,7 @@ export const useEnhancedVideoCall = ({
       initiator,
       trickle: true,
       stream,
-      config: ICE_CONFIG
+      config: getIceConfigSync()
     });
 
     peer.on('signal', async (signal) => {

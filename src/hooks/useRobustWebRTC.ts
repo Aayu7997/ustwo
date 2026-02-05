@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { useCallCoordination } from './useCallCoordination';
 import { toast } from '@/hooks/use-toast';
+import { getIceConfigSync } from '@/lib/webrtc/iceConfig';
 
 interface UseRobustWebRTCProps {
   roomId: string;
@@ -124,30 +125,7 @@ export const useRobustWebRTC = ({
       initiator,
       trickle: true,
       stream: mediaStream,
-      config: {
-        iceServers: [
-          { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:stun1.l.google.com:19302' },
-          { urls: 'stun:stun2.l.google.com:19302' },
-          { urls: 'stun:stun.relay.metered.ca:80' },
-          {
-            urls: 'turn:a.relay.metered.ca:80',
-            username: 'c99f0b4ad86e66f8b0ad0e23',
-            credential: 'zM1ZQmfR7RxGkjBd'
-          },
-          {
-            urls: 'turn:a.relay.metered.ca:443',
-            username: 'c99f0b4ad86e66f8b0ad0e23',
-            credential: 'zM1ZQmfR7RxGkjBd'
-          },
-          {
-            urls: 'turn:a.relay.metered.ca:443?transport=tcp',
-            username: 'c99f0b4ad86e66f8b0ad0e23',
-            credential: 'zM1ZQmfR7RxGkjBd'
-          }
-        ],
-        iceCandidatePoolSize: 10
-      }
+      config: getIceConfigSync()
     });
 
     // Send signals with call ID
