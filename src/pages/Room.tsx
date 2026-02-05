@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRoom, Room as RoomType } from '@/hooks/useRoom';
 import { useAuth } from '@/hooks/useAuth';
 import { useVisibilityHandler } from '@/hooks/useVisibilityHandler';
+import { useRoomStateManager } from '@/hooks/useRoomStateManager';
 import { RoomSidebar } from '@/components/RoomSidebar';
 import { VideoTab } from '@/components/tabs/VideoTab';
 import { NotesTab } from '@/components/tabs/NotesTab';
@@ -37,6 +38,9 @@ const Room: React.FC = () => {
   const [playbackState, setPlaybackState] = useState({ isPlaying: false, currentTime: 0 });
   const [chatMinimized, setChatMinimized] = useState(true);
   const { partnerJoined } = useRoomPresence(roomId || '');
+  
+  // Room state manager - prevents data loss on tab switch
+  const { saveState, updatePlayback } = useRoomStateManager(roomId || '');
   
   // Visibility handler - keeps connections stable when switching tabs
   useVisibilityHandler(roomId || '');
@@ -115,10 +119,13 @@ const Room: React.FC = () => {
           partnerId={partnerId}
           partnerName="Partner"
           onPlaybackStateChange={(state) => {
-            setPlaybackState({
+            const newState = {
               isPlaying: state.is_playing || false,
               currentTime: state.current_time_seconds || 0
-            });
+            };
+            setPlaybackState(newState);
+            // Persist to IndexedDB
+            updatePlayback(newState.currentTime, newState.isPlaying);
           }}
         />
       ),

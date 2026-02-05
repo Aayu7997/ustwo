@@ -81,7 +81,10 @@ export default {
           inactive: "hsl(var(--video-inactive))",
         },
         // Status colors
-        success: "hsl(var(--success))",
+        success: {
+          DEFAULT: "hsl(var(--success))",
+          foreground: "hsl(var(--success-foreground))",
+        },
         warning: "hsl(var(--warning))",
       },
       borderRadius: {

@@ -66,6 +66,7 @@
     
     /* Success/Warning */
     --success: 142 76% 40%;
+    --success-foreground: 0 0% 100%;
     --warning: 38 92% 50%;
   }
 
@@ -112,6 +113,10 @@
     /* Video for dark mode */
     --video-bg: 0 0% 6%;
     --video-control: 0 0% 12%;
+    
+    /* Success/Warning for dark mode */
+    --success: 142 76% 40%;
+    --success-foreground: 0 0% 100%;
   }
 
   /* Romantic Pink Theme */
