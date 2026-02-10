@@ -39,10 +39,7 @@ const Room: React.FC = () => {
   const [chatMinimized, setChatMinimized] = useState(true);
   const { partnerJoined } = useRoomPresence(roomId || '');
   
-  // Room state manager - prevents data loss on tab switch
   const { saveState, updatePlayback } = useRoomStateManager(roomId || '');
-  
-  // Visibility handler - keeps connections stable when switching tabs
   useVisibilityHandler(roomId || '');
 
   useEffect(() => {
@@ -57,7 +54,6 @@ const Room: React.FC = () => {
     setCurrentRoom(room);
   }, [room]);
 
-  // Loading state
   if (authLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -73,11 +69,8 @@ const Room: React.FC = () => {
     );
   }
 
-  if (!user) {
-    return null;
-  }
+  if (!user) return null;
 
-  // Room not found
   if (!currentRoom) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -124,7 +117,6 @@ const Room: React.FC = () => {
               currentTime: state.current_time_seconds || 0
             };
             setPlaybackState(newState);
-            // Persist to IndexedDB
             updatePlayback(newState.currentTime, newState.isPlaying);
           }}
         />
@@ -150,7 +142,6 @@ const Room: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Sidebar */}
       <RoomSidebar
         activeTab={activeTab}
         onTabChange={setActiveTab}
@@ -160,7 +151,6 @@ const Room: React.FC = () => {
         onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
       />
 
-      {/* Main Content */}
       <motion.main
         initial={{ opacity: 0 }}
         animate={{ 
@@ -171,7 +161,6 @@ const Room: React.FC = () => {
         className="min-h-screen"
       >
         <div className="p-6 lg:p-8 max-w-7xl">
-          {/* Partner Presence */}
           {roomId && (
             <motion.div
               initial={{ opacity: 0, y: -10 }}
@@ -182,7 +171,6 @@ const Room: React.FC = () => {
             </motion.div>
           )}
 
-          {/* Tab Content */}
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
@@ -197,7 +185,6 @@ const Room: React.FC = () => {
         </div>
       </motion.main>
       
-      {/* Chat Widget */}
       {roomId && (
         <ChatWidget 
           roomId={roomId}
@@ -206,7 +193,6 @@ const Room: React.FC = () => {
         />
       )}
       
-      {/* Watch Party Effects */}
       {roomId && (
         <WatchPartyEffects
           isPlaying={playbackState.isPlaying}
@@ -216,7 +202,7 @@ const Room: React.FC = () => {
         />
       )}
       
-      {/* Video Call Overlay */}
+      {/* Video Call Overlay - ALWAYS visible when partner exists */}
       {roomId && partnerId && (
         <ProductionCallOverlay
           roomId={roomId}
@@ -225,7 +211,6 @@ const Room: React.FC = () => {
         />
       )}
       
-      {/* Floating Hearts */}
       <FloatingHearts trigger={heartTrigger} />
     </div>
   );

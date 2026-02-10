@@ -12,7 +12,14 @@ const sizeClasses = {
   sm: 'w-8 h-8',
   md: 'w-10 h-10',
   lg: 'w-16 h-16',
-  xl: 'w-20 h-20',
+  xl: 'w-24 h-24',
+};
+
+const textSizeClasses = {
+  sm: 'text-base',
+  md: 'text-xl',
+  lg: 'text-2xl',
+  xl: 'text-3xl',
 };
 
 export const UsTwoLogo: React.FC<UsTwoLogoProps> = ({ 
@@ -21,14 +28,24 @@ export const UsTwoLogo: React.FC<UsTwoLogoProps> = ({
   showText = false 
 }) => {
   return (
-    <div className={cn("flex items-center gap-2", className)}>
-      <img 
-        src={ustwoLogo} 
-        alt="UsTwo Logo" 
-        className={cn(sizeClasses[size], "object-contain")}
-      />
+    <div className={cn("flex items-center gap-2.5", className)}>
+      <div className={cn(
+        sizeClasses[size],
+        "relative rounded-xl overflow-hidden shadow-md ring-1 ring-primary/20 flex-shrink-0"
+      )}>
+        <img 
+          src={ustwoLogo} 
+          alt="UsTwo Logo" 
+          className="w-full h-full object-cover"
+        />
+      </div>
       {showText && (
-        <span className="text-xl font-bold text-gradient">UsTwo</span>
+        <span className={cn(
+          textSizeClasses[size],
+          "font-bold text-gradient tracking-tight"
+        )}>
+          UsTwo
+        </span>
       )}
     </div>
   );
