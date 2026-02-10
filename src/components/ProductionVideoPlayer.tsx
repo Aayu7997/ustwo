@@ -652,7 +652,7 @@ export const ProductionVideoPlayer: React.FC<ProductionVideoPlayerProps> = ({
         className="relative bg-black rounded-xl overflow-hidden shadow-2xl group"
         onMouseEnter={() => setShowControls(true)}
       >
-        {/* Receiving Partner's Stream */}
+        {/* Receiving Partner's Stream - shown ON TOP when available */}
         {isReceiving && remoteStream && (
           <div className="w-full aspect-video relative">
             <video
@@ -674,9 +674,9 @@ export const ProductionVideoPlayer: React.FC<ProductionVideoPlayerProps> = ({
           </div>
         )}
 
-        {/* Waiting for stream handshake (prevents blank player) */}
+        {/* Waiting for stream handshake - show connecting state */}
         {isReceiving && !remoteStream && currentMediaType === 'stream' && !isStreaming && (
-          <div className="w-full aspect-video flex items-center justify-center">
+          <div className="w-full aspect-video flex items-center justify-center bg-black">
             <div className="text-center text-white/80 space-y-2">
               <Loader2 className="w-8 h-8 animate-spin mx-auto" />
               <p className="text-sm">Connecting to partner's stream…</p>
@@ -684,7 +684,7 @@ export const ProductionVideoPlayer: React.FC<ProductionVideoPlayerProps> = ({
           </div>
         )}
 
-        {/* YouTube Player */}
+        {/* YouTube Player - keep visible unless receiving a live remote stream */}
         {!(isReceiving && remoteStream) && currentMediaType === 'youtube' && youtubeVideoId && (
           <RobustYouTubePlayer 
             videoId={youtubeVideoId}
@@ -743,12 +743,19 @@ export const ProductionVideoPlayer: React.FC<ProductionVideoPlayerProps> = ({
           />
         )}
 
-        {/* Native Video Player */}
-        {!(isReceiving && remoteStream) &&
-          currentMediaType !== 'youtube' &&
-          currentMediaType !== 'vimeo' &&
-          !(currentMediaType === 'stream' && !isStreaming) && (
-            <div className="relative w-full aspect-video">
+        {/* Native Video Player - ALWAYS render for host (even while streaming) */}
+        {/* For listener: show unless receiving a live remote stream */}
+        {(
+          (isStreaming) || 
+          (!(isReceiving && remoteStream) && 
+           currentMediaType !== 'youtube' && 
+           currentMediaType !== 'vimeo' &&
+           !(isReceiving && !remoteStream && currentMediaType === 'stream'))
+        ) && (
+            <div className={cn(
+              "relative w-full aspect-video",
+              isReceiving && remoteStream && "hidden"
+            )}>
               <video
                 ref={videoRef}
                 src={videoSrc}
