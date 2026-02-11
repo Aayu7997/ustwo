@@ -202,8 +202,8 @@ const Room: React.FC = () => {
         />
       )}
       
-      {/* Video Call Overlay - ALWAYS visible when partner exists */}
-      {roomId && partnerId && (
+      {/* Video/Voice Call Overlay - ALWAYS visible */}
+      {roomId && (
         <ProductionCallOverlay
           roomId={roomId}
           partnerId={partnerId}
