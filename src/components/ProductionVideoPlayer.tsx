@@ -743,44 +743,48 @@ export const ProductionVideoPlayer: React.FC<ProductionVideoPlayerProps> = ({
           />
         )}
 
-        {/* Native Video Player - ALWAYS render for host (even while streaming) */}
-        {/* For listener: show unless receiving a live remote stream */}
-        {(
-          (isStreaming) || 
-          (!(isReceiving && remoteStream) && 
-           currentMediaType !== 'youtube' && 
-           currentMediaType !== 'vimeo' &&
-           !(isReceiving && !remoteStream && currentMediaType === 'stream'))
-        ) && (
-            <div className={cn(
-              "relative w-full aspect-video",
-              isReceiving && remoteStream && "hidden"
-            )}>
-              <video
-                ref={videoRef}
-                src={videoSrc}
-                className="w-full h-full object-contain"
-                controls={false}
-                playsInline
-                crossOrigin="anonymous"
-                preload="metadata"
-              />
-              
-              {/* Autoplay blocked overlay */}
-              {autoplayBlocked && (
-                <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-20">
-                  <Button 
-                    onClick={() => { setAutoplayBlocked(false); videoRef.current?.play(); }}
-                    size="lg" 
-                    className="gap-2 bg-gradient-romantic"
-                  >
-                    <Play className="w-5 h-5" />
-                    Click to Sync Playback
-                  </Button>
-                </div>
-              )}
+        {/* Native Video Player - ALWAYS render (hidden via CSS when not needed) */}
+        {currentMediaType !== 'youtube' && currentMediaType !== 'vimeo' && (
+          <div className={cn(
+            "relative w-full aspect-video",
+            // Hide visually when receiving a live remote stream, but keep in DOM
+            isReceiving && remoteStream && "hidden"
+          )}>
+            <video
+              ref={videoRef}
+              src={videoSrc}
+              className="w-full h-full object-contain"
+              controls={false}
+              playsInline
+              crossOrigin="anonymous"
+              preload="metadata"
+            />
+            
+            {/* Autoplay blocked overlay */}
+            {autoplayBlocked && (
+              <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-20">
+                <Button 
+                  onClick={() => { setAutoplayBlocked(false); videoRef.current?.play(); }}
+                  size="lg" 
+                  className="gap-2 bg-gradient-romantic"
+                >
+                  <Play className="w-5 h-5" />
+                  Click to Sync Playback
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Empty state when no media loaded and not receiving */}
+        {!videoSrc && !youtubeVideoId && !isReceiving && currentMediaType !== 'stream' && (
+          <div className="w-full aspect-video flex items-center justify-center bg-black/90 rounded-xl">
+            <div className="text-center text-muted-foreground space-y-2">
+              <Play className="w-12 h-12 mx-auto opacity-30" />
+              <p className="text-sm">Paste a URL or upload a file to start watching</p>
             </div>
-          )}
+          </div>
+        )}
 
         {/* Loading Overlay */}
         {isLoading && (

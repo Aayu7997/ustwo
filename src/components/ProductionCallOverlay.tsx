@@ -168,7 +168,7 @@ export const ProductionCallOverlay: React.FC<ProductionCallOverlayProps> = ({
   };
 
   const isInCall = callStatus === 'connecting' || callStatus === 'connected';
-  const showCallButton = callStatus === 'idle' && partnerId;
+  const showCallButton = callStatus === 'idle';
 
   // Hidden mode for voice calls
   if (isHidden && isInCall) {
@@ -215,20 +215,32 @@ export const ProductionCallOverlay: React.FC<ProductionCallOverlayProps> = ({
             className="fixed bottom-6 right-6 z-[100000] flex gap-2"
           >
             <Button
-              onClick={handleStartCall}
+              onClick={() => initiateCall('video')}
+              disabled={!partnerId}
               className={cn(
                 "rounded-full shadow-lg",
                 "bg-gradient-to-r from-primary to-pink-500",
-                "hover:shadow-xl hover:scale-105 transition-all"
+                "hover:shadow-xl hover:scale-105 transition-all",
+                !partnerId && "opacity-50 cursor-not-allowed"
               )}
               size="lg"
             >
-              {voiceOnly ? (
-                <Phone className="w-5 h-5 mr-2" />
-              ) : (
-                <Video className="w-5 h-5 mr-2" />
+              <Video className="w-5 h-5 mr-2" />
+              Video Call
+            </Button>
+            <Button
+              onClick={() => initiateCall('voice')}
+              disabled={!partnerId}
+              variant="secondary"
+              className={cn(
+                "rounded-full shadow-lg",
+                "hover:shadow-xl hover:scale-105 transition-all",
+                !partnerId && "opacity-50 cursor-not-allowed"
               )}
-              {voiceOnly ? 'Voice Call' : 'Video Call'}
+              size="lg"
+            >
+              <Phone className="w-5 h-5 mr-2" />
+              Voice Call
             </Button>
           </motion.div>
         )}

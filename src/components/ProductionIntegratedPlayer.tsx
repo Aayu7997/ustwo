@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { ProductionVideoPlayer } from './ProductionVideoPlayer';
-import { StableVideoCallOverlay } from './StableVideoCallOverlay';
 import { ReactionOverlay } from './ReactionOverlay';
 import { VideoQueue } from './VideoQueue';
 import { TimestampedNotes } from './TimestampedNotes';
@@ -122,13 +121,6 @@ export const ProductionIntegratedPlayer: React.FC<ProductionIntegratedPlayerProp
         roomId={roomId}
         currentVideoTime={currentTime}
         isPlaying={isPlaying}
-      />
-
-      {/* Video Call Overlay - Self-managed call initiation */}
-      <StableVideoCallOverlay
-        roomId={roomId}
-        partnerId={partnerId}
-        partnerName={partnerName}
       />
     </div>
   );
