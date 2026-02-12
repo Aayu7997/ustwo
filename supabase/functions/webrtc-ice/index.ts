@@ -2,34 +2,10 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
   "Access-Control-Allow-Methods": "GET, OPTIONS",
 };
-
-type IceServer = {
-  urls: string | string[];
-  username?: string;
-  credential?: string;
-};
-
-const DEFAULT_ICE_SERVERS: IceServer[] = [
-  { urls: "stun:stun.l.google.com:19302" },
-  {
-    urls: "turn:openrelay.metered.ca:80",
-    username: "openrelayproject",
-    credential: "openrelayproject",
-  },
-  {
-    urls: "turn:openrelay.metered.ca:443",
-    username: "openrelayproject",
-    credential: "openrelayproject",
-  },
-  {
-    urls: "turns:openrelay.metered.ca:443",
-    username: "openrelayproject",
-    credential: "openrelayproject",
-  },
-];
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -43,16 +19,39 @@ serve(async (req) => {
     });
   }
 
-  // NOTE: OpenRelay credentials are public. We still keep this behind an edge function
-  // so clients have a single place to load ICE config and we can swap to dynamic
-  // credentials later without shipping new frontend builds.
-  const iceServers = DEFAULT_ICE_SERVERS;
+  const username = Deno.env.get("METERED_TURN_USERNAME") || "";
+  const credential = Deno.env.get("METERED_TURN_CREDENTIAL") || "";
+
+  const iceServers = [
+    { urls: "stun:stun.l.google.com:19302" },
+    { urls: "stun:stun.relay.metered.ca:80" },
+    {
+      urls: "turn:standard.relay.metered.ca:80",
+      username,
+      credential,
+    },
+    {
+      urls: "turn:standard.relay.metered.ca:80?transport=tcp",
+      username,
+      credential,
+    },
+    {
+      urls: "turn:standard.relay.metered.ca:443",
+      username,
+      credential,
+    },
+    {
+      urls: "turns:standard.relay.metered.ca:443?transport=tcp",
+      username,
+      credential,
+    },
+  ];
 
   return new Response(
     JSON.stringify({
       iceServers,
       iceCandidatePoolSize: 10,
-      source: "edge",
+      source: "edge-metered",
     }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } },
   );
