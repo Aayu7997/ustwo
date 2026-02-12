@@ -12,12 +12,8 @@ interface VideoTabProps {
 }
 
 export const VideoTab: React.FC<VideoTabProps> = ({ 
-  roomId, 
-  roomCode, 
-  isRoomCreator = false,
-  partnerId,
-  partnerName,
-  onPlaybackStateChange 
+  roomId, roomCode, isRoomCreator = false,
+  partnerId, partnerName, onPlaybackStateChange 
 }) => {
   return (
     <motion.div
@@ -27,16 +23,6 @@ export const VideoTab: React.FC<VideoTabProps> = ({
       transition={{ duration: 0.3 }}
       className="space-y-4"
     >
-      <div className="text-center space-y-2">
-        <h2 className="text-2xl font-bold">Watch Together</h2>
-        <p className="text-muted-foreground">
-          {isRoomCreator 
-            ? "You're the host! Control playback for both of you. Upload files, paste YouTube/Vimeo links, or stream P2P."
-            : "You're synced with your partner. Playback is controlled by the host."
-          }
-        </p>
-      </div>
-      
       <ProductionIntegratedPlayer 
         roomId={roomId}
         roomCode={roomCode}

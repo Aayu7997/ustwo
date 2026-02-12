@@ -511,140 +511,69 @@ export const ProductionVideoPlayer: React.FC<ProductionVideoPlayerProps> = ({
       animate={{ opacity: 1, y: 0 }}
       className="w-full space-y-6"
     >
-      {/* Host/Listener Badge */}
-      <div className="flex items-center justify-between">
-        <Badge 
-          variant={isHost ? "default" : "secondary"} 
-          className={cn(
-            "gap-2 py-1.5 px-3",
-            isHost ? "bg-gradient-romantic text-white" : ""
-          )}
-        >
-          {isHost ? (
-            <>
-              <Crown className="w-4 h-4" />
-              You are the Host (controlling playback)
-            </>
-          ) : (
-            <>
-              <Users className="w-4 h-4" />
-              Syncing with Host
-            </>
-          )}
+      {/* Status Bar */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <Badge variant={isHost ? "default" : "secondary"} className={cn("gap-1.5 py-1 px-2.5", isHost && "bg-gradient-romantic text-white")}>
+          {isHost ? <Crown className="w-3.5 h-3.5" /> : <Users className="w-3.5 h-3.5" />}
+          {isHost ? 'Host' : 'Synced'}
         </Badge>
-        
         {isStreaming && (
-          <Badge className="bg-red-500 animate-pulse gap-1">
-            <Radio className="w-3 h-3" />
-            LIVE
+          <Badge className="bg-destructive animate-pulse gap-1 py-1 px-2.5">
+            <Radio className="w-3 h-3" /> LIVE
           </Badge>
         )}
-        
         {isReceiving && (
-          <Badge className="bg-green-500 gap-1">
-            <Wifi className="w-3 h-3" />
-            Receiving Stream
+          <Badge className="bg-green-600 gap-1 py-1 px-2.5">
+            <Wifi className="w-3 h-3" /> Receiving
           </Badge>
         )}
       </div>
 
-      {/* Source Selection - Host Only */}
-      {isHost && (
-        <Card className="p-4 glass-card">
-          <Tabs defaultValue="url" className="w-full">
-            <TabsList className="grid w-full grid-cols-3 mb-4">
-              <TabsTrigger value="url" className="gap-2">
-                <LinkIcon className="w-4 h-4" />
-                URL / YouTube
-              </TabsTrigger>
-              <TabsTrigger value="file" className="gap-2">
-                <Upload className="w-4 h-4" />
-                Local File
-              </TabsTrigger>
-              <TabsTrigger value="stream" className="gap-2">
-                <Radio className="w-4 h-4" />
-                P2P Stream
-              </TabsTrigger>
-            </TabsList>
+      {/* Source Selection - Both users can load media */}
+      <Card className="p-3">
+        <Tabs defaultValue="url" className="w-full">
+          <TabsList className="grid w-full grid-cols-3 mb-3">
+            <TabsTrigger value="url" className="gap-1.5 text-xs">
+              <LinkIcon className="w-3.5 h-3.5" /> URL
+            </TabsTrigger>
+            <TabsTrigger value="file" className="gap-1.5 text-xs">
+              <Upload className="w-3.5 h-3.5" /> File
+            </TabsTrigger>
+            <TabsTrigger value="stream" className="gap-1.5 text-xs">
+              <Radio className="w-3.5 h-3.5" /> Stream
+            </TabsTrigger>
+          </TabsList>
 
-            <TabsContent value="url" className="space-y-4">
-              <div className="flex gap-2">
-                <Input
-                  value={urlInput}
-                  onChange={(e) => setUrlInput(e.target.value)}
-                  placeholder="Paste YouTube, Vimeo, or direct video URL..."
-                  className="flex-1"
-                  onKeyDown={(e) => e.key === 'Enter' && handleLoadUrl()}
-                />
-                <Button onClick={handleLoadUrl} disabled={isLoading || !urlInput.trim()}>
-                  {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Load'}
-                </Button>
-              </div>
-            </TabsContent>
+          <TabsContent value="url">
+            <div className="flex gap-2">
+              <Input value={urlInput} onChange={(e) => setUrlInput(e.target.value)}
+                placeholder="Paste YouTube, Vimeo, or video URL..."
+                className="flex-1 h-9" onKeyDown={(e) => e.key === 'Enter' && handleLoadUrl()} />
+              <Button onClick={handleLoadUrl} disabled={isLoading || !urlInput.trim()} size="sm">
+                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Load'}
+              </Button>
+            </div>
+          </TabsContent>
 
-            <TabsContent value="file" className="space-y-4">
-              <div className="flex gap-2">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="video/*"
-                  onChange={(e) => handleFileSelect(e.target.files)}
-                  className="hidden"
-                />
-                <Button 
-                  onClick={() => fileInputRef.current?.click()}
-                  variant="outline"
-                  className="flex-1"
-                >
-                  <Upload className="w-4 h-4 mr-2" />
-                  Choose Video File
-                </Button>
-              </div>
-              {currentFile && (
-                <p className="text-sm text-muted-foreground">
-                  Loaded: {currentFile.name}
-                </p>
-              )}
-            </TabsContent>
+          <TabsContent value="file">
+            <input ref={fileInputRef} type="file" accept="video/*"
+              onChange={(e) => handleFileSelect(e.target.files)} className="hidden" />
+            <Button onClick={() => fileInputRef.current?.click()} variant="outline" className="w-full h-9" size="sm">
+              <Upload className="w-4 h-4 mr-2" /> Choose Video File
+            </Button>
+            {currentFile && <p className="text-xs text-muted-foreground mt-2">{currentFile.name}</p>}
+          </TabsContent>
 
-            <TabsContent value="stream" className="space-y-4">
-              <div className="flex gap-2">
-                <Button 
-                  onClick={handleToggleStreaming}
-                  disabled={!currentFile || !videoRef.current}
-                  variant={isStreaming ? "destructive" : "default"}
-                  className={cn("flex-1", !isStreaming && "bg-gradient-romantic")}
-                >
-                  {isStreaming ? (
-                    <>
-                      <WifiOff className="w-4 h-4 mr-2" />
-                      Stop Streaming
-                    </>
-                  ) : (
-                    <>
-                      <Radio className="w-4 h-4 mr-2" />
-                      Stream to Partner
-                    </>
-                  )}
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                P2P streaming shares your local video directly with your partner - no upload needed!
-              </p>
-            </TabsContent>
-          </Tabs>
-        </Card>
-      )}
-
-      {/* Listener Info */}
-      {!isHost && (
-        <Card className="p-4 glass-card text-center">
-          <p className="text-muted-foreground flex items-center justify-center gap-2">
-            <Heart className="w-4 h-4 text-primary" />
-            Watching in sync with your partner
-          </p>
-        </Card>
-      )}
+          <TabsContent value="stream">
+            <Button onClick={handleToggleStreaming}
+              disabled={!currentFile || !videoRef.current}
+              variant={isStreaming ? "destructive" : "default"}
+              className={cn("w-full h-9", !isStreaming && "bg-gradient-romantic")} size="sm">
+              {isStreaming ? <><WifiOff className="w-4 h-4 mr-2" /> Stop</> : <><Radio className="w-4 h-4 mr-2" /> Stream to Partner</>}
+            </Button>
+          </TabsContent>
+        </Tabs>
+      </Card>
 
       {/* Video Player */}
       <div 

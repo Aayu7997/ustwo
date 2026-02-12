@@ -3,7 +3,7 @@ import SimplePeer from 'simple-peer';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { toast } from '@/hooks/use-toast';
-import { getIceConfigSync } from '@/lib/webrtc/iceConfig';
+import { getIceConfig, getIceConfigSync } from '@/lib/webrtc/iceConfig';
 
 export type CallState = 'idle' | 'requesting' | 'connecting' | 'connected' | 'reconnecting' | 'failed';
 
@@ -45,17 +45,13 @@ export const useEnhancedVideoCall = ({
   const [isMuted, setIsMuted] = useState(false);
   const [isCameraOff, setIsCameraOff] = useState(voiceOnly);
   const [connectionQuality, setConnectionQuality] = useState<ConnectionQuality>({
-    level: 0,
-    latency: 0,
-    packetLoss: 0
+    level: 0, latency: 0, packetLoss: 0
   });
 
   const MAX_RECONNECT_ATTEMPTS = 3;
 
-  // Full cleanup
   const cleanup = useCallback(() => {
     console.log('[EnhancedCall] Full cleanup');
-    
     peerCreatedRef.current = false;
     signalQueueRef.current = [];
     reconnectAttemptsRef.current = 0;
@@ -64,19 +60,14 @@ export const useEnhancedVideoCall = ({
       clearInterval(statsIntervalRef.current);
       statsIntervalRef.current = null;
     }
-    
     if (peerRef.current) {
-      try {
-        peerRef.current.destroy();
-      } catch {}
+      try { peerRef.current.destroy(); } catch {}
       peerRef.current = null;
     }
-    
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach(track => track.stop());
       localStreamRef.current = null;
     }
-    
     setLocalStream(null);
     setRemoteStream(null);
     setCallState('idle');
@@ -84,82 +75,53 @@ export const useEnhancedVideoCall = ({
     onDisconnected?.();
   }, [onDisconnected]);
 
-  // Get user media with fallbacks
   const getUserMedia = useCallback(async (): Promise<MediaStream | null> => {
     try {
-      console.log('[EnhancedCall] Requesting media, voiceOnly:', voiceOnly);
-      
       const constraints: MediaStreamConstraints = {
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
-        },
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
         video: voiceOnly ? false : {
           width: { ideal: 1280, max: 1920 },
           height: { ideal: 720, max: 1080 },
           frameRate: { ideal: 30, max: 60 }
         }
       };
-
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       localStreamRef.current = stream;
       setLocalStream(stream);
-      console.log('[EnhancedCall] Media acquired:', stream.getTracks().map(t => t.kind));
       return stream;
     } catch (error: any) {
-      console.error('[EnhancedCall] getUserMedia failed:', error);
-      
-      // Try audio-only fallback
       if (!voiceOnly) {
         try {
-          console.log('[EnhancedCall] Falling back to audio-only');
           const audioStream = await navigator.mediaDevices.getUserMedia({ 
-            audio: { echoCancellation: true, noiseSuppression: true }, 
-            video: false 
+            audio: { echoCancellation: true, noiseSuppression: true }, video: false 
           });
           localStreamRef.current = audioStream;
           setLocalStream(audioStream);
           setIsCameraOff(true);
-          toast({
-            title: 'Camera unavailable',
-            description: 'Continuing with voice only'
-          });
+          toast({ title: 'Camera unavailable', description: 'Continuing with voice only' });
           return audioStream;
         } catch {
-          toast({
-            title: 'Media access denied',
-            description: 'Please allow camera/microphone access in your browser settings',
-            variant: 'destructive'
-          });
+          toast({ title: 'Media access denied', description: 'Please allow camera/microphone access', variant: 'destructive' });
         }
       } else {
-        toast({
-          title: 'Microphone access denied',
-          description: 'Please allow microphone access',
-          variant: 'destructive'
-        });
+        toast({ title: 'Microphone access denied', description: 'Please allow microphone access', variant: 'destructive' });
       }
       return null;
     }
   }, [voiceOnly]);
 
-  // Create peer connection
-  const createPeer = useCallback((initiator: boolean, stream: MediaStream): SimplePeer.Instance => {
-    console.log('[EnhancedCall] Creating peer, initiator:', initiator, 'callId:', callId);
+  const createPeer = useCallback((initiator: boolean, stream: MediaStream, iceConfig: any): SimplePeer.Instance => {
+    console.log('[EnhancedCall] Creating peer, initiator:', initiator, 'callId:', callId, 'iceServers:', iceConfig.iceServers?.length);
     
     const peer = new SimplePeer({
       initiator,
       trickle: true,
       stream,
-      config: getIceConfigSync()
+      config: iceConfig
     });
 
     peer.on('signal', async (signal) => {
-      console.log('[EnhancedCall] Signal generated:', (signal as any)?.type || 'candidate');
-      
       if (!roomId || !user?.id || !callId) return;
-
       try {
         await supabase.from('rtc_signaling').insert({
           room_id: roomId,
@@ -174,12 +136,11 @@ export const useEnhancedVideoCall = ({
     });
 
     peer.on('stream', (stream) => {
-      console.log('[EnhancedCall] Received remote stream');
+      console.log('[EnhancedCall] ✅ Received remote stream with', stream.getTracks().length, 'tracks');
       setRemoteStream(stream);
       setCallState('connected');
       reconnectAttemptsRef.current = 0;
       onConnected?.();
-      
       toast({
         title: voiceOnly ? '🎙️ Voice Connected!' : '📹 Video Connected!',
         description: 'You are now connected with your partner'
@@ -189,115 +150,79 @@ export const useEnhancedVideoCall = ({
     peer.on('connect', () => {
       console.log('[EnhancedCall] Data channel connected');
       peerCreatedRef.current = true;
-      
-      // Process any queued signals
       while (signalQueueRef.current.length > 0) {
         const queuedSignal = signalQueueRef.current.shift();
-        try {
-          peer.signal(queuedSignal);
-          console.log('[EnhancedCall] Applied queued signal');
-        } catch {}
+        try { peer.signal(queuedSignal); } catch {}
       }
     });
 
     peer.on('close', () => {
       console.log('[EnhancedCall] Peer closed');
-      if (callState === 'connected') {
-        handleReconnect();
-      }
+      if (callState === 'connected') handleReconnect(iceConfig);
     });
 
     peer.on('error', (err) => {
       console.error('[EnhancedCall] Peer error:', err);
-      handleReconnect();
+      handleReconnect(iceConfig);
     });
 
-    // Set ready after brief delay
-    setTimeout(() => {
-      peerCreatedRef.current = true;
-    }, 100);
-
+    setTimeout(() => { peerCreatedRef.current = true; }, 100);
     return peer;
   }, [roomId, user?.id, callId, voiceOnly, onConnected]);
 
-  // Handle reconnection
-  const handleReconnect = useCallback(() => {
+  const handleReconnect = useCallback((iceConfig: any) => {
     if (reconnectAttemptsRef.current >= MAX_RECONNECT_ATTEMPTS) {
-      console.log('[EnhancedCall] Max reconnect attempts reached');
       setCallState('failed');
-      toast({
-        title: 'Connection failed',
-        description: 'Could not reconnect to call',
-        variant: 'destructive'
-      });
+      toast({ title: 'Connection failed', description: 'Could not reconnect to call', variant: 'destructive' });
       cleanup();
       return;
     }
-
     reconnectAttemptsRef.current++;
     setCallState('reconnecting');
-    
-    console.log(`[EnhancedCall] Reconnect attempt ${reconnectAttemptsRef.current}/${MAX_RECONNECT_ATTEMPTS}`);
-    
-    toast({
-      title: 'Reconnecting...',
-      description: `Attempt ${reconnectAttemptsRef.current} of ${MAX_RECONNECT_ATTEMPTS}`
-    });
+    toast({ title: 'Reconnecting...', description: `Attempt ${reconnectAttemptsRef.current} of ${MAX_RECONNECT_ATTEMPTS}` });
 
-    // Destroy old peer
     if (peerRef.current) {
       try { peerRef.current.destroy(); } catch {}
       peerRef.current = null;
     }
     peerCreatedRef.current = false;
 
-    // Create new peer after short delay
     setTimeout(() => {
       if (localStreamRef.current && callId) {
-        peerRef.current = createPeer(isInitiator, localStreamRef.current);
+        peerRef.current = createPeer(isInitiator, localStreamRef.current, iceConfig);
       }
     }, 1000);
   }, [isInitiator, callId, createPeer, cleanup]);
 
-  // Start the call
   const startCall = useCallback(async () => {
-    if (!callId) {
-      console.log('[EnhancedCall] No callId, cannot start');
-      return;
-    }
+    if (!callId) return;
     
     console.log('[EnhancedCall] Starting call:', callId);
     setCallState('requesting');
     
-    // Get media first
     const stream = await getUserMedia();
-    if (!stream) {
-      setCallState('idle');
-      return;
-    }
+    if (!stream) { setCallState('idle'); return; }
     
     setCallState('connecting');
     
+    // CRITICAL: Await the async ICE config with TURN servers
+    const iceConfig = await getIceConfig();
+    console.log('[EnhancedCall] Using ICE config with', iceConfig.iceServers.length, 'servers');
+    
     // Clean old signals
     try {
-      await supabase
-        .from('rtc_signaling')
-        .delete()
-        .eq('room_id', roomId)
-        .eq('type', 'call_webrtc');
+      await supabase.from('rtc_signaling').delete()
+        .eq('room_id', roomId).eq('type', 'call_webrtc');
     } catch {}
     
-    // Create peer
-    peerRef.current = createPeer(isInitiator, stream);
+    peerRef.current = createPeer(isInitiator, stream, iceConfig);
     
     // If answering, fetch existing signals
     if (!isInitiator) {
       try {
         const { data: signals } = await supabase
-          .from('rtc_signaling')
-          .select('*')
-          .eq('room_id', roomId)
-          .eq('type', 'call_webrtc')
+          .from('rtc_signaling').select('*')
+          .eq('room_id', roomId).eq('type', 'call_webrtc')
           .order('created_at', { ascending: true });
         
         for (const sig of signals || []) {
@@ -305,9 +230,7 @@ export const useEnhancedVideoCall = ({
           const payload = sig.payload as any;
           if (payload?.callId === callId && payload?.signal) {
             if (peerRef.current && peerCreatedRef.current) {
-              try {
-                peerRef.current.signal(payload.signal);
-              } catch {}
+              try { peerRef.current.signal(payload.signal); } catch {}
             } else {
               signalQueueRef.current.push(payload.signal);
             }
@@ -319,24 +242,16 @@ export const useEnhancedVideoCall = ({
     }
   }, [callId, roomId, isInitiator, user?.id, getUserMedia, createPeer]);
 
-  // Toggle mute
   const toggleMute = useCallback(() => {
     if (localStreamRef.current) {
-      const audioTracks = localStreamRef.current.getAudioTracks();
-      audioTracks.forEach(track => {
-        track.enabled = !track.enabled;
-      });
+      localStreamRef.current.getAudioTracks().forEach(track => { track.enabled = !track.enabled; });
       setIsMuted(prev => !prev);
     }
   }, []);
 
-  // Toggle camera
   const toggleCamera = useCallback(() => {
     if (localStreamRef.current && !voiceOnly) {
-      const videoTracks = localStreamRef.current.getVideoTracks();
-      videoTracks.forEach(track => {
-        track.enabled = !track.enabled;
-      });
+      localStreamRef.current.getVideoTracks().forEach(track => { track.enabled = !track.enabled; });
       setIsCameraOff(prev => !prev);
     }
   }, [voiceOnly]);
@@ -345,31 +260,21 @@ export const useEnhancedVideoCall = ({
   useEffect(() => {
     if (!roomId || !user?.id || !callId) return;
 
-    console.log('[EnhancedCall] Setting up signal listener for call:', callId);
-
     const channel = supabase
       .channel(`call_webrtc_${roomId}_${callId}`)
       .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'rtc_signaling',
+        event: 'INSERT', schema: 'public', table: 'rtc_signaling',
         filter: `room_id=eq.${roomId}`
       }, (payload) => {
         const record = payload.new;
-        
         if (record.sender === user.id) return;
         if (record.type !== 'call_webrtc') return;
         
         const signalData = record.payload as any;
         if (!signalData?.signal || signalData.callId !== callId) return;
         
-        console.log('[EnhancedCall] Received signal from DB');
-        
         if (peerRef.current && peerCreatedRef.current) {
-          try {
-            peerRef.current.signal(signalData.signal);
-          } catch (e) {
-            console.log('[EnhancedCall] Signal error, queueing');
+          try { peerRef.current.signal(signalData.signal); } catch (e) {
             signalQueueRef.current.push(signalData.signal);
           }
         } else {
@@ -378,9 +283,7 @@ export const useEnhancedVideoCall = ({
       })
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [roomId, user?.id, callId]);
 
   // Monitor connection quality
@@ -391,11 +294,8 @@ export const useEnhancedVideoCall = ({
       try {
         const peer = peerRef.current as any;
         if (!peer?._pc?.getStats) return;
-        
         const stats = await peer._pc.getStats();
-        let latency = 0;
-        let packetsLost = 0;
-        let packetsReceived = 0;
+        let latency = 0, packetsLost = 0, packetsReceived = 0;
         
         stats.forEach((report: any) => {
           if (report.type === 'candidate-pair' && report.state === 'succeeded') {
@@ -408,8 +308,7 @@ export const useEnhancedVideoCall = ({
         });
         
         const packetLoss = packetsReceived > 0 
-          ? Math.round((packetsLost / (packetsLost + packetsReceived)) * 100 * 10) / 10
-          : 0;
+          ? Math.round((packetsLost / (packetsLost + packetsReceived)) * 100 * 10) / 10 : 0;
         
         let level: 0 | 1 | 2 | 3 | 4 = 4;
         if (latency > 500 || packetLoss > 10) level = 1;
@@ -421,32 +320,17 @@ export const useEnhancedVideoCall = ({
     }, 3000);
 
     return () => {
-      if (statsIntervalRef.current) {
-        clearInterval(statsIntervalRef.current);
-        statsIntervalRef.current = null;
-      }
+      if (statsIntervalRef.current) { clearInterval(statsIntervalRef.current); statsIntervalRef.current = null; }
     };
   }, [callState]);
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      cleanup();
-    };
-  }, []);
+  useEffect(() => { return () => { cleanup(); }; }, []);
 
   return {
-    callState,
-    localStream,
-    remoteStream,
-    isMuted,
-    isCameraOff,
-    connectionQuality,
+    callState, localStream, remoteStream,
+    isMuted, isCameraOff, connectionQuality,
     isConnected: callState === 'connected',
     isConnecting: callState === 'connecting' || callState === 'reconnecting',
-    startCall,
-    cleanup,
-    toggleMute,
-    toggleCamera
+    startCall, cleanup, toggleMute, toggleCamera
   };
 };

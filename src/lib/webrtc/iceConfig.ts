@@ -20,22 +20,23 @@ const FALLBACK_CONFIG: RTCConfiguration = {
 let cachedConfig: RTCConfiguration | null = null;
 let cachedAt = 0;
 let inFlight: Promise<RTCConfiguration> | null = null;
+let configReady = false;
 
 const CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
 
 const isValidConfig = (value: unknown): value is RTCConfiguration => {
   if (!value || typeof value !== "object") return false;
   const v = value as any;
-  return Array.isArray(v.iceServers);
+  return Array.isArray(v.iceServers) && v.iceServers.length > 0;
 };
 
 /**
  * Loads ICE config from edge function and caches it.
- * Falls back to OpenRelay config if edge call fails.
+ * Falls back to STUN-only config if edge call fails.
  */
 export const getIceConfig = async (): Promise<RTCConfiguration> => {
   const now = Date.now();
-  if (cachedConfig && now - cachedAt < CACHE_TTL_MS) return cachedConfig;
+  if (cachedConfig && configReady && now - cachedAt < CACHE_TTL_MS) return cachedConfig;
   if (inFlight) return inFlight;
 
   inFlight = (async () => {
@@ -51,15 +52,17 @@ export const getIceConfig = async (): Promise<RTCConfiguration> => {
           iceCandidatePoolSize: (data as any).iceCandidatePoolSize ?? 10,
         };
         cachedAt = Date.now();
+        configReady = true;
+        console.log('[ICE] Loaded TURN config with', data.iceServers.length, 'servers');
         return cachedConfig;
       }
 
+      throw new Error('Invalid ICE config');
+    } catch (e) {
+      console.warn('[ICE] Edge function failed, using fallback:', e);
       cachedConfig = FALLBACK_CONFIG;
       cachedAt = Date.now();
-      return cachedConfig;
-    } catch {
-      cachedConfig = FALLBACK_CONFIG;
-      cachedAt = Date.now();
+      configReady = true;
       return cachedConfig;
     } finally {
       inFlight = null;
@@ -69,9 +72,11 @@ export const getIceConfig = async (): Promise<RTCConfiguration> => {
   return inFlight;
 };
 
-/** Synchronous access (always returns something). */
+/** Synchronous access – returns cached or fallback. */
 export const getIceConfigSync = (): RTCConfiguration => cachedConfig ?? FALLBACK_CONFIG;
 
-// Fire-and-forget prefetch so WebRTC hooks quickly pick up Edge-provided ICE config.
-void getIceConfig();
+/** Whether the async config has been fetched at least once. */
+export const isIceConfigReady = (): boolean => configReady;
 
+// Prefetch on import
+void getIceConfig();
