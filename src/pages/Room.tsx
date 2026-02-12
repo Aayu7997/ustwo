@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRoom, Room as RoomType } from '@/hooks/useRoom';
@@ -38,30 +38,29 @@ const Room: React.FC = () => {
   const [playbackState, setPlaybackState] = useState({ isPlaying: false, currentTime: 0 });
   const [chatMinimized, setChatMinimized] = useState(true);
   const { partnerJoined } = useRoomPresence(roomId || '');
+  const hasFetchedRef = useRef(false);
   
   const { saveState, updatePlayback } = useRoomStateManager(roomId || '');
   useVisibilityHandler(roomId || '');
 
+  // Fetch room ONCE, not on every re-render
   useEffect(() => {
-    if (roomId && !authLoading && user) {
+    if (roomId && !authLoading && user && !hasFetchedRef.current) {
+      hasFetchedRef.current = true;
       fetchRoom(roomId);
     } else if (roomId && !authLoading && !user) {
       navigate('/auth');
     }
-  }, [roomId, user, authLoading, fetchRoom, navigate]);
+  }, [roomId, user, authLoading]);
 
   useEffect(() => {
-    setCurrentRoom(room);
+    if (room) setCurrentRoom(room);
   }, [room]);
 
   if (authLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="text-center space-y-4"
-        >
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center space-y-4">
           <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto" />
           <p className="text-muted-foreground">Loading your room...</p>
         </motion.div>
@@ -74,23 +73,17 @@ const Room: React.FC = () => {
   if (!currentRoom) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center space-y-6 max-w-md"
-        >
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+          className="text-center space-y-6 max-w-md">
           <div className="w-20 h-20 mx-auto rounded-2xl bg-muted flex items-center justify-center">
             <Heart className="w-10 h-10 text-muted-foreground" />
           </div>
           <div className="space-y-2">
             <h2 className="text-2xl font-bold">Room Not Found</h2>
-            <p className="text-muted-foreground">
-              This room doesn't exist or you don't have access to it.
-            </p>
+            <p className="text-muted-foreground">This room doesn't exist or you don't have access.</p>
           </div>
           <Button onClick={() => navigate('/')} className="gap-2">
-            <ArrowLeft className="w-4 h-4" />
-            Go Home
+            <ArrowLeft className="w-4 h-4" /> Go Home
           </Button>
         </motion.div>
       </div>
@@ -106,16 +99,11 @@ const Room: React.FC = () => {
     const tabComponents: Record<TabType, React.ReactNode> = {
       video: (
         <VideoTab
-          roomId={roomId}
-          roomCode={currentRoom.room_code}
-          isRoomCreator={isRoomCreator}
-          partnerId={partnerId}
+          roomId={roomId} roomCode={currentRoom.room_code}
+          isRoomCreator={isRoomCreator} partnerId={partnerId}
           partnerName="Partner"
           onPlaybackStateChange={(state) => {
-            const newState = {
-              isPlaying: state.is_playing || false,
-              currentTime: state.current_time_seconds || 0
-            };
+            const newState = { isPlaying: state.is_playing || false, currentTime: state.current_time_seconds || 0 };
             setPlaybackState(newState);
             updatePlayback(newState.currentTime, newState.isPlaying);
           }}
@@ -125,60 +113,39 @@ const Room: React.FC = () => {
       notes: <NotesTab />,
       calendar: <CalendarTab roomId={roomId} partnerId={partnerId} />,
       watchlist: <WatchlistTab roomId={roomId} />,
-      'ai-movies': (
-        <AIMoviesTab
-          roomId={roomId}
-          roomCode={currentRoom.room_code || ''}
-          partnerId={currentRoom.partner_id}
-        />
-      ),
+      'ai-movies': <AIMoviesTab roomId={roomId} roomCode={currentRoom.room_code || ''} partnerId={currentRoom.partner_id} />,
       'love-meter': <LoveMeterTab partnerId={currentRoom.partner_id} />,
       themes: <ThemesTab />,
       settings: <SettingsTab roomId={roomId} roomCode={currentRoom.room_code || ''} />,
     };
-
     return tabComponents[activeTab];
   };
 
   return (
     <div className="min-h-screen bg-background">
       <RoomSidebar
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
-        roomCode={currentRoom?.room_code}
-        isPartnerOnline={partnerJoined}
+        activeTab={activeTab} onTabChange={setActiveTab}
+        roomCode={currentRoom?.room_code} isPartnerOnline={partnerJoined}
         isCollapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
       />
 
       <motion.main
         initial={{ opacity: 0 }}
-        animate={{ 
-          opacity: 1,
-          marginLeft: sidebarCollapsed ? 72 : 260
-        }}
+        animate={{ opacity: 1, marginLeft: sidebarCollapsed ? 72 : 260 }}
         transition={{ duration: 0.3 }}
         className="min-h-screen"
       >
-        <div className="p-6 lg:p-8 max-w-7xl">
+        <div className="p-4 lg:p-6 max-w-7xl">
           {roomId && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="mb-6"
-            >
+            <div className="mb-4">
               <PartnerPresence roomId={roomId} />
-            </motion.div>
+            </div>
           )}
-
           <AnimatePresence mode="wait">
-            <motion.div
-              key={activeTab}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.2 }}
-            >
+            <motion.div key={activeTab}
+              initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.15 }}>
               {renderTabContent()}
             </motion.div>
           </AnimatePresence>
@@ -186,29 +153,19 @@ const Room: React.FC = () => {
       </motion.main>
       
       {roomId && (
-        <ChatWidget 
-          roomId={roomId}
-          isMinimized={chatMinimized}
-          onToggleMinimize={() => setChatMinimized(!chatMinimized)}
-        />
+        <ChatWidget roomId={roomId} isMinimized={chatMinimized}
+          onToggleMinimize={() => setChatMinimized(!chatMinimized)} />
       )}
       
       {roomId && (
-        <WatchPartyEffects
-          isPlaying={playbackState.isPlaying}
+        <WatchPartyEffects isPlaying={playbackState.isPlaying}
           currentTime={playbackState.currentTime}
           partnerJoined={!!currentRoom?.partner_id}
-          onSyncEvent={(event) => console.log('Sync event:', event)}
-        />
+          onSyncEvent={() => {}} />
       )}
       
-      {/* Video/Voice Call Overlay - ALWAYS visible */}
       {roomId && (
-        <ProductionCallOverlay
-          roomId={roomId}
-          partnerId={partnerId}
-          partnerName="Partner"
-        />
+        <ProductionCallOverlay roomId={roomId} partnerId={partnerId} partnerName="Partner" />
       )}
       
       <FloatingHearts trigger={heartTrigger} />
