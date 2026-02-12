@@ -212,35 +212,33 @@ export const ProductionCallOverlay: React.FC<ProductionCallOverlayProps> = ({
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.9 }}
-            className="fixed bottom-6 right-6 z-[100000] flex gap-2"
+            className="fixed bottom-24 right-6 z-[99999] flex flex-col gap-2 items-end"
           >
             <Button
               onClick={() => initiateCall('video')}
               disabled={!partnerId}
               className={cn(
-                "rounded-full shadow-lg",
+                "rounded-full shadow-lg h-12 w-12 p-0",
                 "bg-gradient-to-r from-primary to-pink-500",
-                "hover:shadow-xl hover:scale-105 transition-all",
-                !partnerId && "opacity-50 cursor-not-allowed"
+                "hover:shadow-xl hover:scale-110 transition-all",
+                !partnerId && "opacity-40 cursor-not-allowed"
               )}
-              size="lg"
+              title="Video Call"
             >
-              <Video className="w-5 h-5 mr-2" />
-              Video Call
+              <Video className="w-5 h-5" />
             </Button>
             <Button
               onClick={() => initiateCall('voice')}
               disabled={!partnerId}
               variant="secondary"
               className={cn(
-                "rounded-full shadow-lg",
-                "hover:shadow-xl hover:scale-105 transition-all",
-                !partnerId && "opacity-50 cursor-not-allowed"
+                "rounded-full shadow-lg h-12 w-12 p-0",
+                "hover:shadow-xl hover:scale-110 transition-all",
+                !partnerId && "opacity-40 cursor-not-allowed"
               )}
-              size="lg"
+              title="Voice Call"
             >
-              <Phone className="w-5 h-5 mr-2" />
-              Voice Call
+              <Phone className="w-5 h-5" />
             </Button>
           </motion.div>
         )}

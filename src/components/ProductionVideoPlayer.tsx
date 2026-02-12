@@ -651,6 +651,12 @@ export const ProductionVideoPlayer: React.FC<ProductionVideoPlayerProps> = ({
         ref={containerRef}
         className="relative bg-black rounded-xl overflow-hidden shadow-2xl group"
         onMouseEnter={() => setShowControls(true)}
+        onMouseMove={() => {
+          setShowControls(true);
+          if ((window as any).__controlsTimer) clearTimeout((window as any).__controlsTimer);
+          (window as any).__controlsTimer = setTimeout(() => { if (isPlaying) setShowControls(false); }, 3000);
+        }}
+        onMouseLeave={() => { if (isPlaying) setShowControls(false); }}
       >
         {/* Receiving Partner's Stream - shown ON TOP when available */}
         {isReceiving && remoteStream && (
@@ -796,6 +802,101 @@ export const ProductionVideoPlayer: React.FC<ProductionVideoPlayerProps> = ({
           </div>
         )}
 
+        {/* Playback Controls Bar */}
+        <AnimatePresence>
+          {showControls && (videoSrc || youtubeVideoId || (isReceiving && remoteStream)) && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
+              className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent px-4 pt-8 pb-3 z-20"
+              onMouseEnter={() => setShowControls(true)}
+            >
+              {/* Progress Bar */}
+              <div className="mb-3">
+                <Slider
+                  value={[progressPercent]}
+                  onValueChange={handleSeek}
+                  max={100}
+                  step={0.1}
+                  className="cursor-pointer [&_[role=slider]]:h-3 [&_[role=slider]]:w-3 [&_[role=slider]]:bg-primary"
+                />
+              </div>
+
+              <div className="flex items-center justify-between gap-2">
+                {/* Left Controls */}
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => skipTime(-10)}
+                    className="h-8 w-8 text-white hover:bg-white/20"
+                    title="Rewind 10s"
+                  >
+                    <SkipBack className="w-4 h-4" />
+                  </Button>
+
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={togglePlayPause}
+                    className="h-9 w-9 text-white hover:bg-white/20"
+                    title={isPlaying ? 'Pause' : 'Play'}
+                  >
+                    {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
+                  </Button>
+
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => skipTime(10)}
+                    className="h-8 w-8 text-white hover:bg-white/20"
+                    title="Forward 10s"
+                  >
+                    <SkipForward className="w-4 h-4" />
+                  </Button>
+
+                  <span className="text-xs text-white/80 ml-2 tabular-nums select-none">
+                    {formatTime(currentTime)} / {formatTime(duration)}
+                  </span>
+                </div>
+
+                {/* Right Controls */}
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={toggleMute}
+                    className="h-8 w-8 text-white hover:bg-white/20"
+                    title={isMuted ? 'Unmute' : 'Mute'}
+                  >
+                    {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                  </Button>
+
+                  <div className="w-20 hidden sm:block">
+                    <Slider
+                      value={[isMuted ? 0 : volume]}
+                      onValueChange={handleVolumeChange}
+                      max={100}
+                      step={1}
+                      className="[&_[role=slider]]:h-2.5 [&_[role=slider]]:w-2.5 [&_[role=slider]]:bg-white"
+                    />
+                  </div>
+
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={toggleFullscreen}
+                    className="h-8 w-8 text-white hover:bg-white/20"
+                    title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
+                  >
+                    {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
+                  </Button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </motion.div>
   );

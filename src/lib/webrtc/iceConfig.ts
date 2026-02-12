@@ -9,21 +9,7 @@ export type IceServer = {
 
 const FALLBACK_ICE_SERVERS: IceServer[] = [
   { urls: "stun:stun.l.google.com:19302" },
-  {
-    urls: "turn:openrelay.metered.ca:80",
-    username: "openrelayproject",
-    credential: "openrelayproject",
-  },
-  {
-    urls: "turn:openrelay.metered.ca:443",
-    username: "openrelayproject",
-    credential: "openrelayproject",
-  },
-  {
-    urls: "turns:openrelay.metered.ca:443",
-    username: "openrelayproject",
-    credential: "openrelayproject",
-  },
+  { urls: "stun:stun.relay.metered.ca:80" },
 ];
 
 const FALLBACK_CONFIG: RTCConfiguration = {
