@@ -206,61 +206,55 @@ export const useRoom = (roomId?: string) => {
     
     setLoading(true);
     try {
-      let roomData: Room | null = null;
-      
       const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(identifier);
       
-      if (isUUID) {
-        const { data, error } = await supabase
-          .from('rooms')
-          .select('*')
-          .eq('id', identifier)
-          .single();
-          
-        if (error && error.code !== 'PGRST116') throw error;
-        roomData = data;
-      } else {
-        // Try exact match first
-        const { data, error } = await supabase
-          .from('rooms')
-          .select('*')
-          .eq('room_code', identifier.toUpperCase())
-          .single();
-          
-        if (error && error.code !== 'PGRST116') {
-          // Try case-insensitive search
-          const { data: fallbackData, error: fallbackError } = await supabase
-            .from('rooms')
-            .select('*')
-            .ilike('room_code', identifier)
-            .limit(1)
-            .single();
-            
-          if (fallbackError && fallbackError.code !== 'PGRST116') throw fallbackError;
-          roomData = fallbackData;
-        } else {
-          roomData = data;
+      let roomId = identifier;
+      
+      // If it's a room code, first resolve it to a UUID via join_room_by_code
+      if (!isUUID) {
+        const { data, error } = await supabase.rpc('join_room_by_code', { p_code: identifier.toUpperCase() });
+        if (error || !data) {
+          console.log('Room not found by code:', identifier);
+          setRoom(null);
+          return null;
         }
+        const roomData = data as Room;
+        console.log('Room resolved by code:', roomData);
+        setRoom(roomData);
+        return roomData;
       }
 
-      if (!roomData) {
-        console.log('Room not found:', identifier);
+      // Use SECURITY DEFINER RPC to bypass RLS issues
+      const { data, error } = await supabase.rpc('get_room_if_member', { p_room_id: roomId });
+
+      if (error) {
+        console.error('get_room_if_member error:', error);
+        // Fallback to direct query
+        const { data: directData, error: directError } = await supabase
+          .from('rooms')
+          .select('*')
+          .eq('id', roomId)
+          .maybeSingle();
+        
+        if (directError || !directData) {
+          console.log('Room not found:', roomId);
+          setRoom(null);
+          return null;
+        }
+        
+        console.log('Room fetched via direct query:', directData);
+        setRoom(directData as Room);
+        return directData as Room;
+      }
+
+      if (!data) {
+        console.log('Room not found or no access:', roomId);
         setRoom(null);
         return null;
       }
 
-      if (roomData.creator_id !== user.id && roomData.partner_id !== user.id) {
-        console.log('User does not have access to room:', roomData.id);
-        toast({
-          title: "Access Denied",
-          description: "You don't have permission to access this room",
-          variant: "destructive"
-        });
-        setRoom(null);
-        return null;
-      }
-
-      console.log('Room fetched successfully:', roomData);
+      const roomData = data as Room;
+      console.log('Room fetched via RPC:', roomData);
       setRoom(roomData);
       return roomData;
     } catch (error: any) {
