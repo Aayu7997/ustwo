@@ -150,9 +150,13 @@ export const useEnhancedVideoCall = ({
     peer.on('connect', () => {
       console.log('[EnhancedCall] Data channel connected');
       peerCreatedRef.current = true;
-      while (signalQueueRef.current.length > 0) {
-        const queuedSignal = signalQueueRef.current.shift();
-        try { peer.signal(queuedSignal); } catch {}
+      // Flush queued signals
+      const queued = [...signalQueueRef.current];
+      signalQueueRef.current = [];
+      for (const queuedSignal of queued) {
+        try { peer.signal(queuedSignal); } catch (e) {
+          console.warn('[EnhancedCall] Failed to apply queued signal:', e);
+        }
       }
     });
 
@@ -163,10 +167,11 @@ export const useEnhancedVideoCall = ({
 
     peer.on('error', (err) => {
       console.error('[EnhancedCall] Peer error:', err);
-      handleReconnect(iceConfig);
+      if (callState !== 'idle' && callState !== 'failed') handleReconnect(iceConfig);
     });
 
-    setTimeout(() => { peerCreatedRef.current = true; }, 100);
+    // Mark peer as ready immediately for signal processing
+    peerCreatedRef.current = true;
     return peer;
   }, [roomId, user?.id, callId, voiceOnly, onConnected]);
 
@@ -207,13 +212,17 @@ export const useEnhancedVideoCall = ({
     
     // CRITICAL: Await the async ICE config with TURN servers
     const iceConfig = await getIceConfig();
-    console.log('[EnhancedCall] Using ICE config with', iceConfig.iceServers.length, 'servers');
+    console.log('[EnhancedCall] Using ICE config with', iceConfig.iceServers.length, 'servers, initiator:', isInitiator);
     
-    // Clean old signals
-    try {
-      await supabase.from('rtc_signaling').delete()
-        .eq('room_id', roomId).eq('type', 'call_webrtc');
-    } catch {}
+    // Only the INITIATOR cleans old signals to avoid race condition
+    if (isInitiator) {
+      try {
+        await supabase.from('rtc_signaling').delete()
+          .eq('room_id', roomId).eq('type', 'call_webrtc');
+      } catch {}
+      // Small delay to ensure cleanup propagates before creating peer
+      await new Promise(r => setTimeout(r, 300));
+    }
     
     peerRef.current = createPeer(isInitiator, stream, iceConfig);
     

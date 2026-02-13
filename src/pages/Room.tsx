@@ -45,16 +45,18 @@ const Room: React.FC = () => {
 
   // Fetch room ONCE, not on every re-render
   useEffect(() => {
-    if (roomId && !authLoading && user && !hasFetchedRef.current) {
-      hasFetchedRef.current = true;
-      fetchRoom(roomId);
-    } else if (roomId && !authLoading && !user) {
-      navigate('/auth');
-    }
-  }, [roomId, user, authLoading]);
+    if (!roomId || authLoading) return;
+    if (!user) { navigate('/auth'); return; }
+    if (hasFetchedRef.current) return;
+    
+    hasFetchedRef.current = true;
+    fetchRoom(roomId).then((data) => {
+      if (data) setCurrentRoom(data);
+    });
+  }, [roomId, user, authLoading, fetchRoom, navigate]);
 
   useEffect(() => {
-    if (room) setCurrentRoom(room);
+    if (room && !currentRoom) setCurrentRoom(room);
   }, [room]);
 
   if (authLoading || loading) {
@@ -136,16 +138,17 @@ const Room: React.FC = () => {
         transition={{ duration: 0.3 }}
         className="min-h-screen"
       >
-        <div className="p-4 lg:p-6 max-w-7xl">
+        <div className="p-3 lg:p-5 max-w-7xl">
+          {/* Compact top bar with room info */}
           {roomId && (
-            <div className="mb-4">
+            <div className="flex items-center justify-between mb-4">
               <PartnerPresence roomId={roomId} />
             </div>
           )}
           <AnimatePresence mode="wait">
             <motion.div key={activeTab}
-              initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.15 }}>
+              initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.12 }}>
               {renderTabContent()}
             </motion.div>
           </AnimatePresence>
